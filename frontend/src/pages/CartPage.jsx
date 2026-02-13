@@ -47,7 +47,7 @@ export default function CartPage() {
                             <button onClick={clear} className="px-4 py-2 rounded-lg bg-white/5 border border-white/10">Clear</button>
                             <button
                                 onClick={() => navigate("/checkout")}
-                                className="px-5 py-2 rounded-lg bg-white text-black font-semibold"
+                                className="px-5 py-2 rounded-lg bg-white text-white font-semibold"
                             >
                                 Checkout
                             </button>

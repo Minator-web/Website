@@ -77,10 +77,10 @@ export default function OrderDetails() {
                 </div>
 
                 <Link
-                    to="/"
+                    to="/my-orders"
                     className="inline-block px-4 py-2 rounded-lg bg-white text-black font-semibold"
                 >
-                    Back to shop
+                    Back to MyOrders
                 </Link>
             </div>
         </div>

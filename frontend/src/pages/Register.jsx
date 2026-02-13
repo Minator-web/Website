@@ -1,11 +1,14 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 
-export default function Login() {
+export default function Register() {
     const navigate = useNavigate();
+
+    const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+
     const [showPass, setShowPass] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
@@ -16,16 +19,32 @@ export default function Login() {
         setLoading(true);
 
         try {
-            const data = await api("/api/login", {
+            // 1) ثبت نام
+            const reg = await api("/api/register", {
                 method: "POST",
-                body: JSON.stringify({ email, password }),
+                body: JSON.stringify({ name, email, password }),
             });
 
-            const token =
-                data.token ||
-                data.access_token ||
-                data?.token?.plainTextToken ||
-                data?.data?.token;
+            // 2) اگر بک‌اند توکن داد، ذخیره کن
+            let token =
+                reg.token ||
+                reg.access_token ||
+                reg?.token?.plainTextToken ||
+                reg?.data?.token;
+
+            // 3) اگر توکن نداد، اتومات لاگین کن (مثل Login.jsx)
+            if (!token) {
+                const login = await api("/api/login", {
+                    method: "POST",
+                    body: JSON.stringify({ email, password }),
+                });
+
+                token =
+                    login.token ||
+                    login.access_token ||
+                    login?.token?.plainTextToken ||
+                    login?.data?.token;
+            }
 
             if (!token) {
                 setError("Token not received from server");
@@ -34,11 +53,15 @@ export default function Login() {
 
             localStorage.setItem("token", token);
 
-            const me = await api("/api/me");
-            if (me?.is_admin) navigate("/admin");
-            else navigate("/");
+            // بعد ثبت نام: ببر به shop یا سفارش‌ها
+            navigate("/", { replace: true });
         } catch (err) {
-            setError(err?.message || "Network error / API not reachable");
+            // پیام‌های validation لاراول
+            const msg =
+                err?.message ||
+                (err?.errors ? Object.values(err.errors)?.[0]?.[0] : null) ||
+                "Register failed";
+            setError(msg);
         } finally {
             setLoading(false);
         }
@@ -56,27 +79,39 @@ export default function Login() {
                     onSubmit={handleSubmit}
                     className="relative overflow-hidden rounded-3xl border border-white/10 bg-zinc-900/70 shadow-xl backdrop-blur p-7 space-y-5"
                 >
-                    {/* subtle glow */}
-                    <div
-                        className="pointer-events-none absolute -top-24 -right-24 h-48 w-48 rounded-full bg-white/5 blur-2xl"/>
+                    <div className="pointer-events-none absolute -top-24 -right-24 h-48 w-48 rounded-full bg-white/5 blur-2xl" />
 
                     <div className="space-y-1">
                         <h1 className="text-2xl font-extrabold tracking-tight text-white">
-                            Welcome back
+                            Create account
                         </h1>
                         <p className="text-sm text-white/60">
-                            Sign in to continue
+                            Sign up to start shopping
                         </p>
                     </div>
 
                     {error && (
-                        <div
-                            className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
                             {error}
                         </div>
                     )}
 
                     <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-white/80 mb-1.5">
+                                Name
+                            </label>
+                            <input
+                                className={inputCls}
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                type="text"
+                                placeholder="Your name"
+                                autoComplete="name"
+                                required
+                            />
+                        </div>
+
                         <div>
                             <label className="block text-sm font-medium text-white/80 mb-1.5">
                                 Email
@@ -104,7 +139,7 @@ export default function Login() {
                                     onChange={(e) => setPassword(e.target.value)}
                                     type={showPass ? "text" : "password"}
                                     placeholder="••••••••"
-                                    autoComplete="current-password"
+                                    autoComplete="new-password"
                                     required
                                 />
 
@@ -117,20 +152,9 @@ export default function Login() {
                                 </button>
                             </div>
 
-                            <div className="mt-2 flex items-center justify-between">
-                                <label className="flex items-center gap-2 text-xs text-white/60">
-                                    <input type="checkbox" className="h-4 w-4"/>
-                                    Remember me
-                                </label>
-
-                                <button
-                                    type="button"
-                                    className="text-xs font-semibold text-white/60 hover:text-white bg-transparent border-0 p-0"
-                                    onClick={() => alert("Add reset password flow")}
-                                >
-                                    Forgot password?
-                                </button>
-                            </div>
+                            <p className="mt-2 text-xs text-white/50">
+                                Use at least 6 characters.
+                            </p>
                         </div>
                     </div>
 
@@ -138,20 +162,19 @@ export default function Login() {
                         disabled={loading}
                         className="w-full rounded-2xl bg-white/10 px-4 py-3 text-sm font-semibold text-white border border-white/10 hover:bg-white/15 transition disabled:opacity-60 disabled:cursor-not-allowed"
                     >
-                        {loading ? "Logging in..." : "Login"}
+                        {loading ? "Creating..." : "Register"}
                     </button>
-                    <p className="text-center text-xs text-white/60">
-                        Don’t have an account?{" "}
-                        <a href="/register" className="text-white underline">Register</a>
-                    </p>
 
-                    <p className="text-center text-xs text-white/50">
-                        Tip: use a strong password 🙂
+                    <p className="text-center text-xs text-white/60">
+                        Already have an account?{" "}
+                        <Link to="/login" className="text-white underline">
+                            Login
+                        </Link>
                     </p>
                 </form>
 
                 <p className="mt-4 text-center text-xs text-white/40">
-                    © {new Date().getFullYear()} Admin Panel
+                    © {new Date().getFullYear()} Shop
                 </p>
             </div>
         </div>

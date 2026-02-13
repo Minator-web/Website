@@ -106,6 +106,7 @@ class CheckoutController extends Controller
     public function myOrders(Request $request)
     {
         return Order::where('user_id', $request->user()->id)
+            ->with('items')   // یا with('items.product') اگر خواستی
             ->latest()
             ->paginate(10);
     }
@@ -116,6 +117,6 @@ class CheckoutController extends Controller
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
-        return $order->load(['items']);
+        return $order->load(['items.product']); // این خیلی به درد UI می‌خوره
     }
 }

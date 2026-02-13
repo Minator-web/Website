@@ -3,14 +3,19 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Admin\OrderController;
+use App\Http\Controllers\Admin\ProductController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Admin\ProductController;
-use App\Http\Controllers\AuthController;
+
+// public
+Route::get('/products', [PublicProductController::class, 'index']);
+Route::get('/products/{product}', [PublicProductController::class, 'show']);
 
 Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login']);
-// routes/api.php
+Route::middleware('auth:sanctum')
+    ->post('/logout', [AuthController::class, 'logout']);
+Route::post('/login', [AuthController::class, 'login'])
+    ->middleware('throttle:5,1');// routes/api.php
 
 
 Route::middleware(['auth:sanctum', 'is_admin'])
@@ -27,7 +32,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/checkout', [CheckoutController::class, 'store']);
     Route::get('/orders/me', [CheckoutController::class, 'myOrders']);
     Route::get('/orders/me/{order}', [CheckoutController::class, 'showMine']);
-    Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', function (Request $request) {
         return $request->user();
     });

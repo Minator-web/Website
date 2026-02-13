@@ -6,6 +6,7 @@ export async function api(path, options = {}) {
     // اگر کسی اشتباهی بدون / شروع کرد
     const fixedPath = path.startsWith("/") ? path : `/${path}`;
 
+
     const res = await fetch(`${BASE_URL}${fixedPath}`, {
         ...options,
         // برای اینکه درخواست‌های لاگین/CSRF/کوکی هم درست کار کنن
@@ -16,8 +17,12 @@ export async function api(path, options = {}) {
             "Content-Type": "application/json",
             ...(options.headers || {}),
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
+
         },
     });
+    if (res.status === 401) {
+        localStorage.removeItem("token");
+    }
 
     // اگر پاسخ خالی بود (مثلاً 204)
     const text = await res.text();

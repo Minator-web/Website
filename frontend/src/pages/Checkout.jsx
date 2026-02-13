@@ -95,7 +95,7 @@ export default function Checkout() {
 
                     <button
                         disabled={loading}
-                        className="w-full px-5 py-2 rounded-lg bg-white text-black font-semibold disabled:opacity-60"
+                        className="w-full px-5 py-2 rounded-lg bg-white text-white font-semibold disabled:opacity-60"
                     >
                         {loading ? "Placing order..." : "Place Order"}
                     </button>

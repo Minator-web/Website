@@ -10,15 +10,14 @@ export default function Shop() {
     const [products, setProducts] = useState([]);
     const [err, setErr] = useState("");
     const [loading, setLoading] = useState(true);
-
+    const cartCount = items.reduce((sum, it) => sum + Number(it.qty ?? 1), 0);
 
     async function load() {
         setErr("");
         setLoading(true);
         try {
-            // اگر endpoint عمومی نداری، فعلاً از همین استفاده کن یا بعداً public می‌کنیم
-            const res = await api("/api/admin/products"); // paginate
-            setProducts(res?.data || []);
+            const res = await api("/api/products"); // ✅ فقط public
+            setProducts(res?.data || res || []);
         } catch (e) {
             setErr(e?.message || "Failed to load products");
         } finally {
@@ -36,11 +35,18 @@ export default function Shop() {
                 <div className="flex items-center justify-between text-white">
                     <h1 className="text-3xl font-extrabold">Shop</h1>
                     <Link to="/cart" className="px-4 py-2 rounded-lg bg-white/10 border border-white/10">
-                        Cart ({items.length})
+                        Cart ({cartCount})
+                    </Link>
+                    <Link to="/my-orders" className="px-4 py-2 rounded-lg bg-white/10 border border-white/10">
+                        My Orders
                     </Link>
                 </div>
 
-                {err && <div className="text-red-200 bg-red-500/15 border border-red-500/30 p-3 rounded-lg">{err}</div>}
+                {err && (
+                    <div className="text-red-200 bg-red-500/15 border border-red-500/30 p-3 rounded-lg">
+                        {err}
+                    </div>
+                )}
 
                 {loading ? (
                     <div className="text-white/70">Loading...</div>
@@ -54,10 +60,8 @@ export default function Shop() {
 
                                 <button
                                     disabled={!p.is_active || p.stock <= 0}
-                                    onClick={() =>
-                                        add({ product_id: p.id, title: p.title, price: p.price })
-                                    }
-                                    className="mt-4 w-full px-4 py-2 rounded-lg bg-blac text-white font-semibold disabled:opacity-50"
+                                    onClick={() => add({ product_id: p.id, title: p.title, price: p.price })}
+                                    className="mt-4 w-full px-4 py-2 rounded-lg bg-black text-white font-semibold disabled:opacity-50"
                                 >
                                     Add to cart
                                 </button>
