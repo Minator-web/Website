@@ -64,11 +64,34 @@ class OrderController extends Controller
 
     public function update(Request $request, Order $order)
     {
+        $allowedStatuses = ['pending','confirmed','shipped','delivered','cancelled'];
+
         $data = $request->validate([
-            'status' => ['required', 'string', Rule::in($this->allowedStatuses)],
+            'status' => ['required','string', \Illuminate\Validation\Rule::in($allowedStatuses)],
         ]);
 
-        $order->status = $data['status'];
+        $flow = [
+            'pending'   => ['confirmed', 'cancelled'],
+            'confirmed' => ['shipped', 'cancelled'],
+            'shipped'   => ['delivered', 'cancelled'],
+            'delivered' => [],
+            'cancelled' => [],
+        ];
+
+        $from = (string) $order->status;
+        $to   = (string) $data['status'];
+
+        // اجازه بده همون وضعیت قبلی دوباره ست بشه
+        if ($to !== $from) {
+            $allowedNext = $flow[$from] ?? [];
+            if (!in_array($to, $allowedNext, true)) {
+                return response()->json([
+                    'message' => "Invalid status change: {$from} -> {$to}"
+                ], 422);
+            }
+        }
+
+        $order->status = $to;
         $order->save();
 
         return response()->json([

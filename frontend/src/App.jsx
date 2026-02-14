@@ -13,8 +13,10 @@ import GuestRoute from "./routes/GuestRoute";
 import AdminLayout from "./layouts/AdminLayout";
 import Dashboard from "./pages/admin/Dashboard";
 import Products from "./pages/admin/Products";
+import ProductDetails from "./pages/ProductDetails";
 import Orders from "./pages/admin/Orders";
 import MyOrders from "./pages/MyOrders";
+import Profile from "./pages/Profile";
 
 
 import AdminRoute from "./routes/AdminRoute";
@@ -28,7 +30,7 @@ export default function App() {
                 {/* ---------- Public ---------- */}
                 <Route path="/" element={<Shop />} />
                 <Route path="/cart" element={<CartPage />} />
-
+                <Route path="/products/:id" element={<ProductDetails />} />
 
                 {/* ---------- User Protected ---------- */}
                 <Route
@@ -56,6 +58,15 @@ export default function App() {
                     element={
                         <AuthRoute>
                             <OrderSuccess />
+                        </AuthRoute>
+                    }
+                />
+
+                <Route
+                    path="/profile"
+                    element={
+                        <AuthRoute>
+                            <Profile />
                         </AuthRoute>
                     }
                 />

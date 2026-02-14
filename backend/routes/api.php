@@ -7,9 +7,17 @@ use App\Http\Controllers\Admin\ProductController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
+
+
+
+
+
+
 // public
 Route::get('/products', [PublicProductController::class, 'index']);
 Route::get('/products/{product}', [PublicProductController::class, 'show']);
+Route::post('/products/stock', [PublicProductController::class, 'stock']);
+
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::middleware('auth:sanctum')
@@ -32,6 +40,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/checkout', [CheckoutController::class, 'store']);
     Route::get('/orders/me', [CheckoutController::class, 'myOrders']);
     Route::get('/orders/me/{order}', [CheckoutController::class, 'showMine']);
+    Route::patch('/me', [ProfileController::class, 'update']);
+    Route::post('/me/change-password', [ProfileController::class, 'changePassword']);
     Route::get('/me', function (Request $request) {
         return $request->user();
     });

@@ -17,6 +17,7 @@ class CheckoutController extends Controller
             'customer_email' => ['required','email','max:255'],
             'customer_phone' => ['nullable','string','max:50'],
             'shipping_address' => ['required','string','max:2000'],
+            'city' => ['required','string','max:255'],
 
             'items' => ['required','array','min:1'],
             'items.*.product_id' => ['required','integer','exists:products,id'],
@@ -67,9 +68,18 @@ class CheckoutController extends Controller
                 ];
             }
 
-            // 2) shipping fee (فعلاً ثابت یا ساده)
-            $shippingFee = 0;
+            // 2) shipping fee)
+            $city = trim($data['city']);
+
+            $shippingFee = 60000;
+            if (mb_strtolower($city) === 'تهران' || mb_strtolower($city) === 'tehran') {
+                $shippingFee = 30000;
+            }
+            if ($subtotal >= 1000000) {
+                $shippingFee = 0;
+            }
             $total = $subtotal + $shippingFee;
+
 
             // 3) ساخت Order
             $order = Order::create([
@@ -79,11 +89,16 @@ class CheckoutController extends Controller
                 'total_price' => $total,
                 'status' => 'pending',
 
+
                 'customer_name' => $data['customer_name'],
                 'customer_email' => $data['customer_email'],
                 'customer_phone' => $data['customer_phone'] ?? null,
                 'shipping_address' => $data['shipping_address'],
+                'city' => $city,
             ]);
+
+            $order->order_code = 'ORD-' . now()->format('Y') . '-' . str_pad((string)$order->id, 6, '0', STR_PAD_LEFT);
+            $order->save();
 
             // 4) ساخت Order Items
             foreach ($itemsPayload as $row) {

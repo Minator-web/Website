@@ -16,6 +16,7 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->unsignedBigInteger('total_price')->default(0);
             $table->string('status')->default('pending'); // pending, paid, shipped, delivered, cancelled
+            $table->string('city')->nullable();
             $table->timestamps();
         });
 
@@ -27,5 +28,6 @@ return new class extends Migration
     public function down(): void
     {
         Schema::dropIfExists('orders');
+
     }
 };

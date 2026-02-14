@@ -13,35 +13,37 @@ const btnPrimary =
 const btnDark =
     "px-3 py-2 rounded-lg bg-black text-white border border-white/10 hover:bg-white/5 transition";
 
+// ✅ فاز ۱ بدون پرداخت
+const STATUS = ["pending", "confirmed", "shipped", "delivered", "cancelled"];
+
+const STATUS_META = {
+    pending:   { label: "pending",   cls: "bg-amber-500/15 border-amber-500/30 text-amber-200" },
+    confirmed: { label: "confirmed", cls: "bg-blue-500/15 border-blue-500/30 text-blue-200" },
+    shipped:   { label: "shipped",   cls: "bg-sky-500/15 border-sky-500/30 text-sky-200" },
+    delivered: { label: "delivered", cls: "bg-emerald-500/15 border-emerald-500/30 text-emerald-200" },
+    cancelled: { label: "cancelled", cls: "bg-red-500/15 border-red-500/30 text-red-200" },
+};
+
+const FLOW = {
+    pending: ["pending", "confirmed", "cancelled"],
+    confirmed: ["confirmed", "shipped", "cancelled"],
+    shipped: ["shipped", "delivered", "cancelled"],
+    delivered: ["delivered"],
+    cancelled: ["cancelled"],
+};
+
 function StatusBadge({ status }) {
     const s = String(status || "").toLowerCase();
-
-    const cls = useMemo(() => {
-        if (["paid", "success", "completed"].includes(s))
-            return "bg-emerald-500/15 border-emerald-500/30 text-emerald-200";
-        if (["pending", "waiting"].includes(s))
-            return "bg-amber-500/15 border-amber-500/30 text-amber-200";
-        if (["shipped", "sent", "delivered"].includes(s))
-            return "bg-sky-500/15 border-sky-500/30 text-sky-200";
-        if (["cancelled", "canceled", "failed"].includes(s))
-            return "bg-red-500/15 border-red-500/30 text-red-200";
-        return "bg-zinc-500/15 border-white/10 text-white/70";
-    }, [s]);
-
-    return (
-        <span className={`px-2 py-1 rounded-full border text-xs ${cls}`}>
-      {status ?? "unknown"}
-    </span>
-    );
+    const meta = STATUS_META[s];
+    const cls = meta?.cls ?? "bg-zinc-500/15 border-white/10 text-white/70";
+    const label = meta?.label ?? (status ?? "unknown");
+    return <span className={`px-2 py-1 rounded-full border text-xs ${cls}`}>{label}</span>;
 }
 
 function formatDate(iso) {
     if (!iso) return "-";
-    try {
-        return new Date(iso).toLocaleString();
-    } catch {
-        return iso;
-    }
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? String(iso) : d.toLocaleString();
 }
 
 function money(x) {
@@ -55,8 +57,8 @@ export default function Orders() {
     const [items, setItems] = useState([]);
     const [loading, setLoading] = useState(true);
     const [err, setErr] = useState("");
+    const [saving, setSaving] = useState(false);
 
-    // فیلتر ساده
     const [q, setQ] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
 
@@ -71,12 +73,17 @@ export default function Orders() {
     const [statusOrder, setStatusOrder] = useState(null);
     const [newStatus, setNewStatus] = useState("pending");
 
-
-    async function load() {
+    async function load({ status = statusFilter, search = q } = {}) {
         setErr("");
         setLoading(true);
         try {
-            const data = await api("/api/admin/orders");
+            const params = new URLSearchParams();
+            if (status && status !== "all") params.set("status", status);
+            const s = (search || "").trim();
+            if (s) params.set("search", s);
+            params.set("per_page", "50");
+
+            const data = await api(`/api/admin/orders?${params.toString()}`);
             setItems(data?.data || []);
         } catch (e) {
             setErr(e?.message || "Failed to load orders");
@@ -86,36 +93,22 @@ export default function Orders() {
     }
 
     useEffect(() => {
-        load();
-    }, []);
+        const t = setTimeout(() => {
+            load({ status: statusFilter, search: q });
+        }, 300);
+        return () => clearTimeout(t);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [statusFilter, q]);
 
-    const filtered = useMemo(() => {
-        const text = q.trim().toLowerCase();
-        return (items || []).filter((o) => {
-            const stOk =
-                statusFilter === "all"
-                    ? true
-                    : String(o.status || "").toLowerCase() === statusFilter;
-
-            if (!stOk) return false;
-            if (!text) return true;
-
-            const idStr = String(o.id ?? "");
-            const email = o.user?.email ? String(o.user.email) : "";
-            const name = o.user?.name ? String(o.user.name) : "";
-
-            return (
-                idStr.includes(text) ||
-                email.toLowerCase().includes(text) ||
-                name.toLowerCase().includes(text)
-            );
-        });
-    }, [items, q, statusFilter]);
+    // چون فیلتر/سرچ رو از سرور می‌گیریم، filtered لازم نیست؛
+    // ولی برای امنیت اگر خواستی می‌تونی این رو نگه داری. اینجا حذفش کردیم:
+    const list = useMemo(() => items || [], [items]);
 
     async function openView(orderId) {
         setViewErr("");
         setViewLoading(true);
         setViewOpen(true);
+        setViewOrder(null);
 
         try {
             const data = await api(`/api/admin/orders/${orderId}`);
@@ -130,33 +123,37 @@ export default function Orders() {
 
     function openStatus(order) {
         setStatusOrder(order);
-        setNewStatus(String(order?.status || "pending"));
+        const cur = String(order?.status || "pending").toLowerCase();
+        const allowed = FLOW[cur] || ["pending"];
+        setNewStatus(allowed.includes(cur) ? cur : allowed[0]);
         setStatusOpen(true);
     }
+
 
     async function handleUpdateStatus(e) {
         e.preventDefault();
         if (!statusOrder?.id) return;
 
         setErr("");
+        setSaving(true);
         try {
-            // 🔧 اگر روتت فرق داره اینو عوض کن:
-            // PATCH /api/admin/orders/{id}/status
-            // یا PUT /api/admin/orders/{id}
             await api(`/api/admin/orders/${statusOrder.id}`, {
                 method: "PATCH",
                 body: JSON.stringify({ status: newStatus }),
             });
 
-            await load();     // لیست رفرش
-
+            await load();
             setStatusOpen(false);
             setStatusOrder(null);
 
-            // رفرش لیست
-            load();
+            // اگر همین سفارشو تو View باز داری، آپدیتش کن
+            if (viewOrder?.id === statusOrder.id) {
+                setViewOrder((prev) => (prev ? { ...prev, status: newStatus } : prev));
+            }
         } catch (e2) {
             setErr(e2?.message || "Update status failed");
+        } finally {
+            setSaving(false);
         }
     }
 
@@ -166,12 +163,10 @@ export default function Orders() {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-extrabold text-white">Orders</h1>
-                    <p className="text-white/50 text-sm mt-1">
-                        View and manage customer orders
-                    </p>
+                    <p className="text-white/50 text-sm mt-1">View and manage customer orders</p>
                 </div>
 
-                <button onClick={load} className={btnDark}>
+                <button onClick={() => load()} className={btnDark}>
                     Refresh
                 </button>
             </div>
@@ -204,11 +199,10 @@ export default function Orders() {
                             onChange={(e) => setStatusFilter(e.target.value)}
                         >
                             <option value="all">All</option>
-                            <option value="pending">pending</option>
-                            <option value="paid">paid</option>
-                            <option value="shipped">shipped</option>
-                            <option value="delivered">delivered</option>
-                            <option value="cancelled">cancelled</option>
+                            {(FLOW[String(statusOrder?.status || "pending").toLowerCase()] || STATUS).map((s) => (
+                                <option key={s} value={s}>{s}</option>
+                            ))}
+
                         </select>
                     </div>
                 </div>
@@ -218,12 +212,12 @@ export default function Orders() {
             <div className="bg-zinc-900/70 border border-white/10 rounded-2xl shadow p-5">
                 <div className="flex items-center justify-between mb-4">
                     <h2 className="font-semibold text-white">List</h2>
-                    <span className="text-sm text-white/50">{filtered.length} items</span>
+                    <span className="text-sm text-white/50">{list.length} items</span>
                 </div>
 
                 {loading ? (
                     <div className="text-white/70">Loading...</div>
-                ) : filtered.length === 0 ? (
+                ) : list.length === 0 ? (
                     <div className="text-white/60">No orders.</div>
                 ) : (
                     <div className="overflow-auto rounded-xl border border-white/10">
@@ -241,12 +235,9 @@ export default function Orders() {
                             </thead>
 
                             <tbody>
-                            {filtered.map((o) => (
-                                <tr
-                                    key={o.id}
-                                    className="border-b border-white/10 hover:bg-white/5 transition"
-                                >
-                                    <td className="py-3 px-3">{o.id}</td>
+                            {list.map((o) => (
+                                <tr key={o.id} className="border-b border-white/10 hover:bg-white/5 transition">
+                                    <td className="py-3 px-3">{o.order_code ?? o.id}</td>
 
                                     <td className="py-3 px-3 font-medium">
                                         {o.user?.name ?? o.customer_name ?? "-"}
@@ -262,9 +253,7 @@ export default function Orders() {
                                         <StatusBadge status={o.status} />
                                     </td>
 
-                                    <td className="py-3 px-3 text-white/70">
-                                        {formatDate(o.created_at)}
-                                    </td>
+                                    <td className="py-3 px-3 text-white/70">{formatDate(o.created_at)}</td>
 
                                     <td className="py-3 px-3">
                                         <div className="flex gap-2">
@@ -291,110 +280,142 @@ export default function Orders() {
             {/* View Modal */}
             {viewOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                    <div
-                        className="absolute inset-0 bg-black/70"
-                        onClick={() => setViewOpen(false)}
-                    />
+                    <div className="absolute inset-0 bg-black/70" onClick={() => setViewOpen(false)} />
 
-                    <div className="relative w-full max-w-2xl bg-zinc-900 border border-white/10 text-white rounded-2xl shadow-xl p-5">
+                    <div className="relative w-full max-w-3xl bg-zinc-900 border border-white/10 text-white rounded-2xl shadow-xl p-5">
                         <div className="flex items-center justify-between mb-4">
                             <div>
-                                <h3 className="font-semibold text-lg">Order #{viewOrder?.id}</h3>
+                                <h3 className="font-semibold text-lg">  Order #{viewOrder?.order_code ?? viewOrder?.id ?? ""}
+                                </h3>
                                 <div className="mt-1">
                                     <StatusBadge status={viewOrder?.status} />
                                 </div>
                             </div>
 
-                            <button
-                                onClick={() => setViewOpen(false)}
-                                className="text-white/70 hover:text-white"
-                            >
+                            <button onClick={() => setViewOpen(false)} className="text-white/70 hover:text-white">
                                 ✕
                             </button>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="bg-white/5 border border-white/10 rounded-xl p-4">
-                                <div className="text-white/60 text-xs">Customer</div>
-                                <div className="font-medium mt-1">
-                                    {viewOrder?.user?.name ?? viewOrder?.customer_name ?? "-"}
-                                </div>
-                                <div className="text-white/70 text-sm mt-1">
-                                    {viewOrder?.user?.email ?? viewOrder?.customer_email ?? "-"}
-                                </div>
+                        {viewLoading ? (
+                            <div className="text-white/60 bg-white/5 border border-white/10 rounded-xl p-4">
+                                Loading...
                             </div>
-
-                            <div className="bg-white/5 border border-white/10 rounded-xl p-4">
-                                <div className="text-white/60 text-xs">Total</div>
-                                <div className="font-extrabold text-2xl mt-1">
-                                    {money(viewOrder?.total_price ?? viewOrder?.total ?? viewOrder?.amount)}
-                                </div>
-                                <div className="text-white/60 text-xs mt-2">Created</div>
-                                <div className="text-white/80 text-sm mt-1">
-                                    {formatDate(viewOrder?.created_at)}
-                                </div>
+                        ) : viewErr ? (
+                            <div className="text-red-300 bg-red-500/10 border border-red-500/20 rounded-xl p-4">
+                                {viewErr}
                             </div>
-                        </div>
+                        ) : !viewOrder ? (
+                            <div className="text-white/60 bg-white/5 border border-white/10 rounded-xl p-4">
+                                No data
+                            </div>
+                        ) : (
+                            <>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {/* Customer */}
+                                    <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+                                        <div className="text-white/60 text-xs">Customer</div>
+                                        <div className="font-medium mt-1">
+                                            {viewOrder?.user?.name ?? viewOrder?.customer_name ?? "-"}
+                                        </div>
+                                        <div className="text-white/70 text-sm mt-1">
+                                            {viewOrder?.user?.email ?? viewOrder?.customer_email ?? "-"}
+                                        </div>
+                                        {viewOrder?.customer_phone ? (
+                                            <div className="text-white/70 text-sm mt-1">{viewOrder.customer_phone}</div>
+                                        ) : null}
+                                    </div>
 
-                        {/* Items */}
-                        <div className="mt-4">
-                            <h4 className="font-semibold mb-2">Items</h4>
+                                    {/* Created + Totals */}
+                                    <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+                                        <div className="text-white/60 text-xs">Created</div>
+                                        <div className="text-white/80 text-sm mt-1">{formatDate(viewOrder?.created_at)}</div>
 
-                            {viewLoading ? (
-                                <div className="text-white/60 bg-white/5 border border-white/10 rounded-xl p-4">
-                                    Loading...
+                                        <div className="mt-3 space-y-2">
+                                            <div className="flex items-center justify-between text-sm">
+                                                <div className="text-white/60">Subtotal</div>
+                                                <div className="font-semibold">{money(viewOrder?.subtotal ?? 0)}</div>
+                                            </div>
+
+                                            <div className="flex items-center justify-between text-sm">
+                                                <div className="text-white/60">Shipping</div>
+                                                <div className="font-semibold">{money(viewOrder?.shipping_fee ?? 0)}</div>
+                                            </div>
+
+                                            <div className="border-t border-white/10 pt-2 flex items-center justify-between">
+                                                <div className="text-white/60">Total</div>
+                                                <div className="font-extrabold text-xl">{money(viewOrder?.total_price ?? 0)}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* City */}
+                                    <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+                                        <div className="text-white/60 text-xs">City</div>
+                                        <div className="font-medium mt-1">{viewOrder?.city ?? "-"}</div>
+                                    </div>
+
+                                    {/* Address */}
+                                    <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+                                        <div className="text-white/60 text-xs">Shipping address</div>
+                                        <div className="text-white/80 text-sm mt-1 whitespace-pre-wrap">
+                                            {viewOrder?.shipping_address ?? "-"}
+                                        </div>
+                                    </div>
                                 </div>
-                            ) : viewErr ? (
-                                <div className="text-red-300 bg-red-500/10 border border-red-500/20 rounded-xl p-4">
-                                    {viewErr}
-                                </div>
-                            ) : Array.isArray(viewOrder?.items) && viewOrder.items.length > 0 ? (
-                                <div className="overflow-auto rounded-xl border border-white/10">
-                                    <table className="min-w-363.75 w-full text-sm text-white/90">
-                                        <thead>
-                                        <tr className="text-left border-b border-white/10 text-white/70 bg-white/5">
-                                            <th className="py-3 px-3">Product</th>
-                                            <th className="py-3 px-3">Qty</th>
-                                            <th className="py-3 px-3">Price</th>
-                                            <th className="py-3 px-3">Subtotal</th>
-                                        </tr>
-                                        </thead>
-                                        <tbody>
-                                        {viewOrder.items.map((it, idx) => {
-                                            const qty = Number(it.qty ?? it.quantity ?? 1);
-                                            const pr = Number(it.price ?? it.unit_price ?? 0);
-                                            const sub = qty * pr;
 
-                                            return (
-                                                <tr
-                                                    key={it.id ?? idx}
-                                                    className="border-b border-white/10 hover:bg-white/5 transition"
-                                                >
-                                                    <td className="py-3 px-3 font-medium">
-                                                        {it.product?.title ?? it.product_title ?? it.title ?? "-"}
-                                                    </td>
-                                                    <td className="py-3 px-3">{qty}</td>
-                                                    <td className="py-3 px-3">{money(pr)}</td>
-                                                    <td className="py-3 px-3">{money(sub)}</td>
+                                {/* Items */}
+                                <div className="mt-5">
+                                    <h4 className="font-semibold mb-2">Items</h4>
+
+                                    {Array.isArray(viewOrder?.items) && viewOrder.items.length > 0 ? (
+                                        <div className="overflow-auto rounded-xl border border-white/10">
+                                            <table className="min-w-363.75 w-full text-sm text-white/90">
+                                                <thead>
+                                                <tr className="text-left border-b border-white/10 text-white/70 bg-white/5">
+                                                    <th className="py-3 px-3">Product</th>
+                                                    <th className="py-3 px-3">Qty</th>
+                                                    <th className="py-3 px-3">Price</th>
+                                                    <th className="py-3 px-3">Subtotal</th>
                                                 </tr>
-                                            );
-                                        })}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            ) : (
-                                <div className="text-white/60 bg-white/5 border border-white/10 rounded-xl p-4">
-                                    No items found (اگر API آیتم‌ها رو نمی‌فرسته، باید تو بک‌اند load کنیم)
-                                </div>
-                            )}
-                        </div>
+                                                </thead>
+                                                <tbody>
+                                                {viewOrder.items.map((it, idx) => {
+                                                    const qty = Number(it.qty ?? it.quantity ?? 1);
+                                                    const pr = Number(it.price ?? it.unit_price ?? 0);
+                                                    const sub = qty * pr;
 
+                                                    return (
+                                                        <tr
+                                                            key={it.id ?? idx}
+                                                            className="border-b border-white/10 hover:bg-white/5 transition"
+                                                        >
+                                                            <td className="py-3 px-3 font-medium">
+                                                                {it.product?.title ?? it.product_title ?? it.title ?? "-"}
+                                                            </td>
+                                                            <td className="py-3 px-3">{qty}</td>
+                                                            <td className="py-3 px-3">{money(pr)}</td>
+                                                            <td className="py-3 px-3">{money(sub)}</td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    ) : (
+                                        <div className="text-white/60 bg-white/5 border border-white/10 rounded-xl p-4">
+                                            No items found
+                                        </div>
+                                    )}
+                                </div>
 
-                        <div className="flex justify-end mt-5">
-                            <button className={btnPrimary} onClick={() => setViewOpen(false)}>
-                                Close
-                            </button>
-                        </div>
+                                <div className="flex justify-end mt-5">
+                                    <button className={btnPrimary} onClick={() => setViewOpen(false)}>
+                                        Close
+                                    </button>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
             )}
@@ -402,21 +423,13 @@ export default function Orders() {
             {/* Change Status Modal */}
             {statusOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                    <div
-                        className="absolute inset-0 bg-black/70"
-                        onClick={() => setStatusOpen(false)}
-                    />
+                    <div className="absolute inset-0 bg-black/70" onClick={() => setStatusOpen(false)} />
 
                     <div className="relative w-full max-w-lg bg-zinc-900 border border-white/10 text-white rounded-2xl shadow-xl p-5">
                         <div className="flex items-center justify-between mb-4">
-                            <h3 className="font-semibold text-lg">
-                                Change Status (Order #{statusOrder?.id})
-                            </h3>
+                            <h3 className="font-semibold text-lg">Change Status (Order #{statusOrder?.id})</h3>
 
-                            <button
-                                onClick={() => setStatusOpen(false)}
-                                className="text-white/70 hover:text-white"
-                            >
+                            <button onClick={() => setStatusOpen(false)} className="text-white/70 hover:text-white">
                                 ✕
                             </button>
                         </div>
@@ -429,12 +442,11 @@ export default function Orders() {
                                     value={newStatus}
                                     onChange={(e) => setNewStatus(e.target.value)}
                                 >
-                                    <option value="pending">pending</option>
-                                    <option value="paid">paid</option>
-                                    <option value="shipped">shipped</option>
-                                    <option value="delivered">delivered</option>
-                                    <option value="cancelled">cancelled</option>
+                                    {STATUS.map((s) => (
+                                        <option key={s} value={s}>{s}</option>
+                                    ))}
                                 </select>
+
                                 <div className="mt-2">
                                     <StatusBadge status={newStatus} />
                                 </div>
@@ -448,12 +460,12 @@ export default function Orders() {
                                 >
                                     Cancel
                                 </button>
-                                <button type="submit">Save</button>
+
+                                <button type="submit" className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white hover:bg-white/10 transition" disabled={saving}>
+                                    {saving ? "Saving..." : "Save"}
+                                </button>
                             </div>
                         </form>
-
-                        <div className="text-white/50 text-xs mt-4">
-                        </div>
                     </div>
                 </div>
             )}

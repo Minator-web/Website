@@ -20,6 +20,10 @@ export default function Sidebar() {
                 <NavLink to="/admin/orders" className={linkClass}>
                     Orders
                 </NavLink>
+                <NavLink to="/profile"
+                         className={linkClass}>
+                    Profile
+                </NavLink>
             </nav>
         </aside>
     );

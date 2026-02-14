@@ -124,7 +124,7 @@ export default function Dashboard() {
                         <div className="text-white/60">No orders yet.</div>
                     ) : (
                         <div className="overflow-auto rounded-xl border border-white/10">
-                            <table className="min-w-[700px] w-full text-sm text-white/90">
+                            <table className="min-w-175 w-full text-sm text-white/90">
                                 <thead>
                                 <tr className="text-left border-b border-white/10 text-white/70 bg-white/5">
                                     <th className="py-3 px-3">ID</th>

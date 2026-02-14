@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import {Link, NavLink, Outlet, useNavigate} from "react-router-dom";
 import { api } from "../lib/api";
 
 const linkBase =
@@ -65,6 +65,14 @@ export default function AdminLayout() {
                                     }
                                 >
                                     Orders
+                                </NavLink>
+
+                                <NavLink to="/profile"
+                                         className={({ isActive }) =>
+                                             '${linkBase} ${isActive ? linkActive : linkInactive}'
+                                         }
+                                             >
+                                    Profile
                                 </NavLink>
                             </nav>
                         </div>

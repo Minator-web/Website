@@ -27,6 +27,8 @@ export default function Products() {
     const [stock, setStock] = useState("");
     const [description, setDescription] = useState("");
     const [isActive, setIsActive] = useState(true);
+    const [image, setImage] = useState(null);
+
 
     // Edit modal
     const [editOpen, setEditOpen] = useState(false);
@@ -36,6 +38,9 @@ export default function Products() {
     const [editStock, setEditStock] = useState("");
     const [editDescription, setEditDescription] = useState("");
     const [editIsActive, setEditIsActive] = useState(true);
+    const [editImage, setEditImage] = useState(null);
+
+
 
     async function load() {
         setErr("");
@@ -59,15 +64,17 @@ export default function Products() {
         setErr("");
 
         try {
+            const fd = new FormData();
+            fd.append("title", title);
+            fd.append("price", String(Number(price)));
+            fd.append("stock", String(Number(stock)));
+            fd.append("description", description || "");
+            fd.append("is_active", isActive ? "1" : "0");
+            if (image) fd.append("image", image);
+
             await api("/api/admin/products", {
                 method: "POST",
-                body: JSON.stringify({
-                    title,
-                    price: Number(price),
-                    stock: Number(stock),
-                    description: description || null,
-                    is_active: isActive,
-                }),
+                body: fd,
             });
 
             setTitle("");
@@ -75,6 +82,7 @@ export default function Products() {
             setStock("");
             setDescription("");
             setIsActive(true);
+            setImage(null);
 
             load();
         } catch (e) {
@@ -87,6 +95,7 @@ export default function Products() {
         }
     }
 
+
     function openEdit(p) {
         setErr("");
         setEditId(p.id);
@@ -96,6 +105,7 @@ export default function Products() {
         setEditDescription(p.description ?? "");
         setEditIsActive(!!p.is_active);
         setEditOpen(true);
+        setEditImage(null);
     }
 
     async function handleUpdate(e) {
@@ -103,15 +113,18 @@ export default function Products() {
         setErr("");
 
         try {
+            const fd = new FormData();
+            fd.append("title", editTitle);
+            fd.append("price", String(Number(editPrice)));
+            fd.append("stock", String(Number(editStock)));
+            fd.append("description", editDescription || "");
+            fd.append("is_active", editIsActive ? "1" : "0");
+            if (editImage) fd.append("image", editImage);
+
             await api(`/api/admin/products/${editId}`, {
-                method: "PUT",
-                body: JSON.stringify({
-                    title: editTitle,
-                    price: Number(editPrice),
-                    stock: Number(editStock),
-                    description: editDescription || null,
-                    is_active: editIsActive,
-                }),
+                method: "POST",
+                body: fd,
+                headers: { "X-HTTP-Method-Override": "PUT" },
             });
 
             setEditOpen(false);
@@ -126,6 +139,8 @@ export default function Products() {
             }
         }
     }
+
+
 
     async function handleDelete(id) {
         if (!confirm("Delete this product?")) return;
@@ -238,6 +253,17 @@ export default function Products() {
                     />
                 </div>
 
+                <div>
+                    <label className={labelCls}>Image</label>
+                    <input
+                        className={inputCls}
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => setImage(e.target.files?.[0] || null)}
+                    />
+                </div>
+
+
                 <div className="pt-1">
                     <button className={btnPrimary}>Create</button>
                 </div>
@@ -260,11 +286,13 @@ export default function Products() {
                             <thead>
                             <tr className="text-left border-b border-white/10 text-white/70 bg-white/5">
                                 <th className="py-3 px-3">ID</th>
+                                <th className="py-3 px-3">Image</th>
                                 <th className="py-3 px-3">Title</th>
                                 <th className="py-3 px-3">Price</th>
                                 <th className="py-3 px-3">Stock</th>
                                 <th className="py-3 px-3">Active</th>
                                 <th className="py-3 px-3 w-40">Actions</th>
+
                             </tr>
                             </thead>
 
@@ -275,6 +303,18 @@ export default function Products() {
                                     className="border-b border-white/10 hover:bg-white/5 transition"
                                 >
                                     <td className="py-3 px-3">{p.id}</td>
+                                    <td className="py-3 px-3">
+                                        {p.image_url ? (
+                                            <img
+                                                src={p.image_url}
+                                                alt=""
+                                                className="h-10 w-10 rounded-lg object-cover border border-white/10"
+                                            />
+                                        ) : (
+                                            <span className="text-white/40 text-xs">-</span>
+                                        )}
+                                    </td>
+
                                     <td className="py-3 px-3 font-medium">{p.title}</td>
                                     <td className="py-3 px-3">{p.price}</td>
                                     <td className="py-3 px-3">{p.stock}</td>
@@ -393,6 +433,16 @@ export default function Products() {
                                     rows={3}
                                 />
                             </div>
+                            <div>
+                                <label className={labelCls}>New Image (optional)</label>
+                                <input
+                                    className={inputCls}
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => setEditImage(e.target.files?.[0] || null)}
+                                />
+                            </div>
+
 
                             <div className="flex items-center justify-end gap-2 pt-2">
                                 <button
