@@ -21,7 +21,6 @@ class DashboardController extends Controller
 
         $todayOrders = Order::whereDate('created_at', $today)->count();
 
-        // اگر فیلدت total_price هست:
         $todayRevenue = (int) Order::whereDate('created_at', $today)->sum('total_price');
         $totalRevenue = (int) Order::sum('total_price');
 

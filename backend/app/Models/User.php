@@ -48,4 +48,10 @@ class User extends Authenticatable
             'is_admin' => 'boolean',
         ];
     }
+    public function wishlistProducts()
+    {
+        return $this->belongsToMany(\App\Models\Product::class, 'wishlists')->withTimestamps();
+    }
+
+
 }

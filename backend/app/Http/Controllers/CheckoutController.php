@@ -3,16 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Models\Order;
-use App\Models\OrderItem;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Services\ShippingService;
 
 class CheckoutController extends Controller
 {
     public function store(Request $request)
     {
         $data = $request->validate([
+            'client_request_id' => ['nullable', 'string', 'max:80'], // ✅ idempotency
+
             'customer_name' => ['required','string','max:255'],
             'customer_email' => ['required','email','max:255'],
             'customer_phone' => ['nullable','string','max:50'],
@@ -26,19 +28,32 @@ class CheckoutController extends Controller
 
         $user = $request->user();
 
-        return DB::transaction(function () use ($data, $user) {
+        $mergedItems = collect($data['items'])
+            ->groupBy('product_id')
+            ->map(function ($rows, $productId) {
+                return [
+                    'product_id' => (int) $productId,
+                    'qty' => (int) $rows->sum('qty'),
+                ];
+            })
+            ->values()
+            ->all();
 
-            // 1) محصولات را از DB بگیر (برای قیمت/اکتیو/استوک واقعی)
-            $productIds = collect($data['items'])->pluck('product_id')->unique()->values();
-            $products = Product::whereIn('id', $productIds)->lockForUpdate()->get()->keyBy('id');
+        return DB::transaction(function () use ($data, $user, $mergedItems) {
+
+            $productIds = collect($mergedItems)->pluck('product_id')->values();
+            $products = Product::whereIn('id', $productIds)
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
 
             $itemsPayload = [];
             $subtotal = 0;
 
-            foreach ($data['items'] as $it) {
+            foreach ($mergedItems as $it) {
                 $p = $products->get($it['product_id']);
                 if (!$p) {
-                    abort(422, "Product not found");
+                    return response()->json(['message' => "Product not found"], 422);
                 }
 
                 if (!$p->is_active) {
@@ -47,15 +62,16 @@ class CheckoutController extends Controller
 
                 $qty = (int) $it['qty'];
 
-                if ($p->stock < $qty) {
+                if ((int) $p->stock < $qty) {
                     return response()->json([
                         'message' => "Insufficient stock for {$p->title}",
                         'product_id' => $p->id,
-                        'available' => $p->stock
+                        'available' => (int) $p->stock,
+                        'requested' => $qty,
                     ], 422);
                 }
 
-                $unitPrice = (int) $p->price; // فرض: قیمت رو integer ذخیره کردی
+                $unitPrice = (int) $p->price;
                 $lineSubtotal = $unitPrice * $qty;
                 $subtotal += $lineSubtotal;
 
@@ -68,26 +84,44 @@ class CheckoutController extends Controller
                 ];
             }
 
-            // 2) shipping fee)
             $city = trim($data['city']);
 
             $shippingFee = 60000;
-            if (mb_strtolower($city) === 'تهران' || mb_strtolower($city) === 'tehran') {
+            if (mb_strtolower($city) === 'Tehran' || mb_strtolower($city) === 'tehran') {
                 $shippingFee = 30000;
             }
             if ($subtotal >= 1000000) {
                 $shippingFee = 0;
             }
+
             $total = $subtotal + $shippingFee;
 
+            $clientRequestId = $data['client_request_id'] ?? null;
 
-            // 3) ساخت Order
+            if (!empty($clientRequestId)) {
+                $existing = Order::where('client_request_id', $clientRequestId)->first();
+                if ($existing) {
+                    return response()->json([
+                        'message' => 'Order already created',
+                        'order' => $existing->load(['items.product','user']),
+                    ], 200);
+                }
+            }
+
+            $shipping = app(ShippingService::class)->calculate($city, $subtotal);
+            $shippingFee = (int) $shipping['shipping_fee'];
+            $shippingMethod = $shipping['shipping_method'];
+
+            $total = $subtotal + $shippingFee;
+
             $order = Order::create([
                 'user_id' => $user->id,
+                'client_request_id' => $clientRequestId,
                 'subtotal' => $subtotal,
                 'shipping_fee' => $shippingFee,
                 'total_price' => $total,
-                'status' => 'pending',
+                'status' => Order::STATUS_PENDING,
+                'shipping_method' => $shippingMethod,
 
 
                 'customer_name' => $data['customer_name'],
@@ -100,13 +134,12 @@ class CheckoutController extends Controller
             $order->order_code = 'ORD-' . now()->format('Y') . '-' . str_pad((string)$order->id, 6, '0', STR_PAD_LEFT);
             $order->save();
 
-            // 4) ساخت Order Items
+
             foreach ($itemsPayload as $row) {
                 $order->items()->create($row);
             }
 
-            // 5) کم کردن stock
-            foreach ($data['items'] as $it) {
+            foreach ($mergedItems as $it) {
                 $p = $products->get($it['product_id']);
                 $p->decrement('stock', (int)$it['qty']);
             }
@@ -121,7 +154,7 @@ class CheckoutController extends Controller
     public function myOrders(Request $request)
     {
         return Order::where('user_id', $request->user()->id)
-            ->with('items')   // یا with('items.product') اگر خواستی
+            ->with('items')
             ->latest()
             ->paginate(10);
     }
@@ -132,6 +165,45 @@ class CheckoutController extends Controller
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
-        return $order->load(['items.product']); // این خیلی به درد UI می‌خوره
+        return $order->load(['items.product']);
+    }
+
+    public function cancelMine(Request $request, Order $order)
+    {
+        if ($order->user_id !== $request->user()->id) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        if ($order->status === Order::STATUS_CANCELLED) {
+            return response()->json([
+                'message' => 'Order already cancelled',
+                'order' => $order->load(['items.product']),
+            ], 200);
+        }
+
+        if (!in_array($order->status, [Order::STATUS_PENDING, Order::STATUS_CONFIRMED], true)) {
+            return response()->json([
+                'message' => 'Order cannot be cancelled in current status',
+                'status' => $order->status,
+            ], 422);
+        }
+
+        return DB::transaction(function () use ($order) {
+            $order->load('items');
+
+            foreach ($order->items as $item) {
+                Product::where('id', $item->product_id)
+                    ->lockForUpdate()
+                    ->increment('stock', (int) $item->qty);
+            }
+
+            $order->status = Order::STATUS_CANCELLED;
+            $order->save();
+
+            return response()->json([
+                'message' => 'Order cancelled',
+                'order' => $order->fresh()->load(['items.product']),
+            ], 200);
+        });
     }
 }

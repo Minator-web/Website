@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import { api } from "../lib/api";
+import { useToast } from "../context/ToastContext";
 
 const input =
     "w-full rounded-lg bg-zinc-950 border border-white/10 text-white placeholder:text-white/40 p-2 focus:outline-none focus:ring-2 focus:ring-white/20";
@@ -17,7 +18,8 @@ function calcShipping(city, subtotal) {
 }
 
 export default function Checkout() {
-    const { items, total, clear } = useCart();
+    const { items, clear } = useCart();
+    const toast = useToast();
     const navigate = useNavigate();
 
     const [name, setName] = useState("");
@@ -26,7 +28,12 @@ export default function Checkout() {
     const [city, setCity] = useState("");
     const [address, setAddress] = useState("");
     const [loading, setLoading] = useState(false);
-    const [err, setErr] = useState("");
+
+    // ✅ idempotency key: تا زمانی که صفحه/فرم رفرش نشده ثابت می‌مونه
+    const [clientRequestId, setClientRequestId] = useState(() => {
+        if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+        return `req_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    });
 
     const subtotal = useMemo(
         () => items.reduce((sum, it) => sum + Number(it.price) * Number(it.qty), 0),
@@ -58,11 +65,12 @@ export default function Checkout() {
 
     async function submit(e) {
         e.preventDefault();
-        setErr("");
+        if (loading) return; // ✅ جلوگیری از دوبار submit
         setLoading(true);
 
         try {
             const payload = {
+                client_request_id: clientRequestId,
                 customer_name: name.trim(),
                 customer_email: email.trim().toLowerCase(),
                 customer_phone: phone.trim() || null,
@@ -79,10 +87,32 @@ export default function Checkout() {
                 body: JSON.stringify(payload),
             });
 
+            const orderId = res?.order?.id;
+            if (!orderId) {
+                throw { message: "Invalid server response (missing order id)" };
+            }
+
+            toast.push({
+                type: "success",
+                title: "Order placed",
+                message: "Your order was created successfully.",
+            });
+
             clear();
-            navigate(`/order-success/${res.order.id}`);
+
+            // ✅ برای سفارش بعدی، کلید جدید بساز (فقط بعد از موفقیت)
+            setClientRequestId(() => {
+                if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+                return `req_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+            });
+
+            navigate(`/order-success/${orderId}`);
         } catch (e2) {
-            setErr(e2?.message || "Checkout failed");
+            toast.push({
+                type: "error",
+                title: "Checkout failed",
+                message: e2?.message || "Checkout failed",
+            });
         } finally {
             setLoading(false);
         }
@@ -98,12 +128,6 @@ export default function Checkout() {
                 >
                     <h1 className="text-2xl font-extrabold">Checkout</h1>
 
-                    {err && (
-                        <div className="bg-red-500/15 border border-red-500/30 text-red-200 p-3 rounded-lg">
-                            {err}
-                        </div>
-                    )}
-
                     <div>
                         <label className={label}>Name</label>
                         <input
@@ -111,6 +135,7 @@ export default function Checkout() {
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             required
+                            disabled={loading}
                         />
                     </div>
 
@@ -122,6 +147,7 @@ export default function Checkout() {
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             required
+                            disabled={loading}
                         />
                     </div>
 
@@ -131,6 +157,7 @@ export default function Checkout() {
                             className={input}
                             value={phone}
                             onChange={(e) => setPhone(e.target.value)}
+                            disabled={loading}
                         />
                     </div>
 
@@ -141,6 +168,7 @@ export default function Checkout() {
                             value={city}
                             onChange={(e) => setCity(e.target.value)}
                             required
+                            disabled={loading}
                             placeholder="مثلاً تهران"
                         />
                     </div>
@@ -153,18 +181,24 @@ export default function Checkout() {
                             value={address}
                             onChange={(e) => setAddress(e.target.value)}
                             required
+                            disabled={loading}
                         />
                     </div>
 
                     <button
                         disabled={loading}
-                        className="w-full px-5 py-2 rounded-lg bg-white text-white font-semibold disabled:opacity-60"
+                        className="w-full px-5 py-2 rounded-lg bg-white text-black font-semibold disabled:opacity-60"
                     >
                         {loading ? "Placing order..." : "Place Order"}
                     </button>
 
                     <div className="text-xs text-white/50">
                         Shipping fee and totals will be finalized by the server.
+                    </div>
+
+                    {/* فقط برای دیباگ/اطمینان؛ اگر دوست نداری حذفش کن */}
+                    <div className="text-[10px] text-white/30 break-all">
+                        request_id: {clientRequestId}
                     </div>
                 </form>
 

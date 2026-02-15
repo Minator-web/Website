@@ -4,7 +4,7 @@ import { getCart, setCart, clearCart } from "../lib/cart";
 const CartCtx = createContext(null);
 
 export function CartProvider({ children }) {
-    const [items, setItems] = useState(() => getCart());
+    const [items, setItems] = useState(() => getCart() || []);
     // item shape: { product_id, title, price, qty }
 
     useEffect(() => {
@@ -16,10 +16,26 @@ export function CartProvider({ children }) {
             const found = prev.find((x) => x.product_id === item.product_id);
             if (found) {
                 return prev.map((x) =>
-                    x.product_id === item.product_id ? { ...x, qty: x.qty + 1 } : x
+                    x.product_id === item.product_id
+                        ? {
+                            ...x,
+                            // اگر قیمت/عنوان تغییر کرده، همگام کنیم
+                            title: item.title ?? x.title,
+                            price: item.price ?? x.price,
+                            qty: Number(x.qty || 0) + 1,
+                        }
+                        : x
                 );
             }
-            return [...prev, { ...item, qty: 1 }];
+            return [
+                ...prev,
+                {
+                    product_id: item.product_id,
+                    title: item.title,
+                    price: item.price,
+                    qty: 1,
+                },
+            ];
         });
     }
 
@@ -30,7 +46,7 @@ export function CartProvider({ children }) {
     function inc(product_id) {
         setItems((prev) =>
             prev.map((x) =>
-                x.product_id === product_id ? { ...x, qty: x.qty + 1 } : x
+                x.product_id === product_id ? { ...x, qty: Number(x.qty || 0) + 1 } : x
             )
         );
     }
@@ -39,14 +55,16 @@ export function CartProvider({ children }) {
         setItems((prev) =>
             prev
                 .map((x) =>
-                    x.product_id === product_id ? { ...x, qty: Math.max(1, x.qty - 1) } : x
+                    x.product_id === product_id
+                        ? { ...x, qty: Math.max(1, Number(x.qty || 1) - 1) }
+                        : x
                 )
-                .filter((x) => x.qty > 0)
+                .filter((x) => Number(x.qty || 0) > 0)
         );
     }
 
     function updateQty(product_id, qty) {
-        const q = Math.max(1, Number(qty || 1));
+        const q = Math.max(1, Math.floor(Number(qty || 1)));
         setItems((prev) =>
             prev.map((x) => (x.product_id === product_id ? { ...x, qty: q } : x))
         );

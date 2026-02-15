@@ -1,47 +1,97 @@
 <?php
 
-namespace App\Http\Controllers;
-
-use App\Http\Controllers\Admin\OrderController;
-use App\Http\Controllers\Admin\ProductController;
+use App\Http\Controllers\WishlistController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CheckoutController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\PublicProductController;
 
+use App\Http\Controllers\Admin\OrderController;
+use App\Http\Controllers\Admin\ProductController;
+use App\Http\Controllers\Admin\DashboardController;
 
+/*
+|--------------------------------------------------------------------------
+| Public Routes
+|--------------------------------------------------------------------------
+*/
 
-
-
-
-// public
+// Products (public)
 Route::get('/products', [PublicProductController::class, 'index']);
 Route::get('/products/{product}', [PublicProductController::class, 'show']);
 Route::post('/products/stock', [PublicProductController::class, 'stock']);
 
+// Auth (rate limited)
+Route::post('/register', [AuthController::class, 'register'])
+    ->middleware('throttle:5,1');
 
-Route::post('/register', [AuthController::class, 'register']);
-Route::middleware('auth:sanctum')
-    ->post('/logout', [AuthController::class, 'logout']);
 Route::post('/login', [AuthController::class, 'login'])
-    ->middleware('throttle:5,1');// routes/api.php
+    ->middleware('throttle:5,1');
 
 
-Route::middleware(['auth:sanctum', 'is_admin'])
+/*
+|--------------------------------------------------------------------------
+| Admin Routes
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware(['auth:sanctum', 'is_admin', 'throttle:60,1'])
     ->prefix('admin')
     ->group(function () {
+
+        Route::patch('orders/{order}/tracking', [OrderController::class, 'setTracking']);
+
         Route::apiResource('products', ProductController::class);
-        Route::get('dashboard', [\App\Http\Controllers\Admin\DashboardController::class, 'index']);
+
+        Route::get('dashboard', [DashboardController::class, 'index']);
+
         Route::apiResource('orders', OrderController::class)
             ->only(['index', 'show', 'update', 'destroy']);
     });
 
 
+/*
+|--------------------------------------------------------------------------
+| Authenticated User Routes
+|--------------------------------------------------------------------------
+*/
+
+
 Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/checkout', [CheckoutController::class, 'store']);
+    Route::get('/wishlist', [WishlistController::class, 'index']);
+    Route::get('/wishlist/ids', [WishlistController::class, 'ids']);
+    Route::post('/wishlist/{product}/toggle', [WishlistController::class, 'toggle']);
+    Route::delete('/wishlist/{product}', [WishlistController::class, 'destroy']); // اختیاری
+});
+
+
+Route::middleware('auth:sanctum')->group(function () {
+
+    // Checkout (حساس → throttle)
+    Route::post('/checkout', [CheckoutController::class, 'store'])
+        ->middleware('throttle:10,1');
+
+    // Cancel order (حساس → throttle)
+    Route::post('/orders/me/{order}/cancel', [CheckoutController::class, 'cancelMine'])
+        ->middleware('throttle:10,1');
+
+    // My Orders
     Route::get('/orders/me', [CheckoutController::class, 'myOrders']);
     Route::get('/orders/me/{order}', [CheckoutController::class, 'showMine']);
-    Route::patch('/me', [ProfileController::class, 'update']);
-    Route::post('/me/change-password', [ProfileController::class, 'changePassword']);
+
+    // Profile
+    Route::patch('/me', [ProfileController::class, 'update'])
+        ->middleware('throttle:30,1');
+
+    Route::post('/me/change-password', [ProfileController::class, 'changePassword'])
+        ->middleware('throttle:10,1');
+
+    Route::post('/logout', [AuthController::class, 'logout'])
+        ->middleware('throttle:10,1');
+
     Route::get('/me', function (Request $request) {
         return $request->user();
     });

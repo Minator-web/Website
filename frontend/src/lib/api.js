@@ -59,6 +59,11 @@ export async function api(path, options = {}) {
         throw { ...data, message: msg, status: 422 };
     }
 
+    if (res.status === 429) {
+        throw { ...data, status: 429, message: data?.message || "Too many requests. Please try again later." };
+    }
+
+
     if (!res.ok) {
         throw { ...data, status: res.status, message: data?.message || "Request failed" };
     }

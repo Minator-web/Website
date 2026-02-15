@@ -13,6 +13,9 @@ const btnPrimary =
 const btnDark =
     "px-3 py-2 rounded-lg bg-black text-white border border-white/10 hover:bg-white/5 transition";
 
+const btnGhost =
+    "px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white hover:bg-white/10 transition disabled:opacity-60";
+
 // ✅ فاز ۱ بدون پرداخت
 const STATUS = ["pending", "confirmed", "shipped", "delivered", "cancelled"];
 
@@ -25,9 +28,9 @@ const STATUS_META = {
 };
 
 const FLOW = {
-    pending: ["pending", "confirmed", "cancelled"],
+    pending:   ["pending", "confirmed", "cancelled"],
     confirmed: ["confirmed", "shipped", "cancelled"],
-    shipped: ["shipped", "delivered", "cancelled"],
+    shipped:   ["shipped", "delivered", "cancelled"],
     delivered: ["delivered"],
     cancelled: ["cancelled"],
 };
@@ -68,6 +71,11 @@ export default function Orders() {
     const [viewLoading, setViewLoading] = useState(false);
     const [viewErr, setViewErr] = useState("");
 
+    // Tracking edit (Option B)
+    const [trackingInput, setTrackingInput] = useState("");
+    const [trackingSaving, setTrackingSaving] = useState(false);
+    const [trackingErr, setTrackingErr] = useState("");
+
     // Update status modal
     const [statusOpen, setStatusOpen] = useState(false);
     const [statusOrder, setStatusOrder] = useState(null);
@@ -76,17 +84,21 @@ export default function Orders() {
     async function load({ status = statusFilter, search = q } = {}) {
         setErr("");
         setLoading(true);
+
         try {
             const params = new URLSearchParams();
             if (status && status !== "all") params.set("status", status);
+
             const s = (search || "").trim();
             if (s) params.set("search", s);
+
             params.set("per_page", "50");
 
             const data = await api(`/api/admin/orders?${params.toString()}`);
             setItems(data?.data || []);
         } catch (e) {
             setErr(e?.message || "Failed to load orders");
+            setItems([]);
         } finally {
             setLoading(false);
         }
@@ -100,19 +112,22 @@ export default function Orders() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [statusFilter, q]);
 
-    // چون فیلتر/سرچ رو از سرور می‌گیریم، filtered لازم نیست؛
-    // ولی برای امنیت اگر خواستی می‌تونی این رو نگه داری. اینجا حذفش کردیم:
     const list = useMemo(() => items || [], [items]);
 
     async function openView(orderId) {
         setViewErr("");
+        setTrackingErr("");
         setViewLoading(true);
         setViewOpen(true);
         setViewOrder(null);
+        setTrackingInput(""); // ✅ قبل از لود خالی کن
 
         try {
             const data = await api(`/api/admin/orders/${orderId}`);
             setViewOrder(data);
+
+            // ✅ اینجا data وجود داره
+            setTrackingInput(data?.tracking_code ?? "");
         } catch (e) {
             setViewErr(e?.message || "Failed to load order");
             setViewOrder(null);
@@ -121,41 +136,94 @@ export default function Orders() {
         }
     }
 
+    function closeView() {
+        setViewOpen(false);
+        setViewOrder(null);
+        setViewErr("");
+        setTrackingInput("");
+        setTrackingErr("");
+        setTrackingSaving(false);
+    }
+
     function openStatus(order) {
         setStatusOrder(order);
+
         const cur = String(order?.status || "pending").toLowerCase();
         const allowed = FLOW[cur] || ["pending"];
         setNewStatus(allowed.includes(cur) ? cur : allowed[0]);
+
         setStatusOpen(true);
     }
 
+    async function saveTracking() {
+        if (!viewOrder?.id) return;
+
+        setTrackingErr("");
+        setTrackingSaving(true);
+
+        try {
+            const res = await api(`/api/admin/orders/${viewOrder.id}/tracking`, {
+                method: "PATCH",
+                body: JSON.stringify({ tracking_code: trackingInput.trim() || null }),
+            });
+
+            const updated = res?.order ?? res;
+
+            // ✅ مودال رو با دیتای جدید آپدیت کن
+            setViewOrder(updated);
+
+            // ✅ لیست جدول هم آپدیت شه
+            setItems((prev) =>
+                prev.map((x) => (x.id === updated.id ? { ...x, tracking_code: updated.tracking_code } : x))
+            );
+        } catch (e) {
+            setTrackingErr(e?.message || "Failed to update tracking");
+        } finally {
+            setTrackingSaving(false);
+        }
+    }
 
     async function handleUpdateStatus(e) {
         e.preventDefault();
         if (!statusOrder?.id) return;
 
+        const from = String(statusOrder?.status || "").toLowerCase();
+        const allowed = FLOW[from] || [];
+        if (!allowed.includes(newStatus)) {
+            setErr(`Invalid status change: ${from} -> ${newStatus}`);
+            return;
+        }
+
         setErr("");
         setSaving(true);
+
         try {
             await api(`/api/admin/orders/${statusOrder.id}`, {
                 method: "PATCH",
                 body: JSON.stringify({ status: newStatus }),
             });
 
-            await load();
+            setItems((prev) =>
+                prev.map((x) => (x.id === statusOrder.id ? { ...x, status: newStatus } : x))
+            );
+
+            setViewOrder((prev) =>
+                prev && prev.id === statusOrder.id ? { ...prev, status: newStatus } : prev
+            );
+
             setStatusOpen(false);
             setStatusOrder(null);
-
-            // اگر همین سفارشو تو View باز داری، آپدیتش کن
-            if (viewOrder?.id === statusOrder.id) {
-                setViewOrder((prev) => (prev ? { ...prev, status: newStatus } : prev));
-            }
         } catch (e2) {
             setErr(e2?.message || "Update status failed");
         } finally {
             setSaving(false);
         }
     }
+
+    const allowedStatusOptions = useMemo(() => {
+        const cur = String(statusOrder?.status || "pending").toLowerCase();
+        return FLOW[cur] || STATUS;
+    }, [statusOrder]);
 
     return (
         <div className="space-y-6">
@@ -166,7 +234,7 @@ export default function Orders() {
                     <p className="text-white/50 text-sm mt-1">View and manage customer orders</p>
                 </div>
 
-                <button onClick={() => load()} className={btnDark}>
+                <button onClick={() => load()} className={btnDark} type="button">
                     Refresh
                 </button>
             </div>
@@ -199,10 +267,11 @@ export default function Orders() {
                             onChange={(e) => setStatusFilter(e.target.value)}
                         >
                             <option value="all">All</option>
-                            {(FLOW[String(statusOrder?.status || "pending").toLowerCase()] || STATUS).map((s) => (
-                                <option key={s} value={s}>{s}</option>
+                            {STATUS.map((s) => (
+                                <option key={s} value={s}>
+                                    {s}
+                                </option>
                             ))}
-
                         </select>
                     </div>
                 </div>
@@ -247,7 +316,7 @@ export default function Orders() {
                                         {o.user?.email ?? o.customer_email ?? "-"}
                                     </td>
 
-                                    <td className="py-3 px-3">{money(o.total_price ?? o.total ?? o.amount)}</td>
+                                    <td className="py-3 px-3">{money(o.total_price)}</td>
 
                                     <td className="py-3 px-3">
                                         <StatusBadge status={o.status} />
@@ -260,11 +329,12 @@ export default function Orders() {
                                             <button
                                                 onClick={() => openView(o.id)}
                                                 className="px-3 py-2 rounded-lg bg-white/10 border border-white/10 text-white hover:bg-white/15 transition"
+                                                type="button"
                                             >
                                                 View
                                             </button>
 
-                                            <button onClick={() => openStatus(o)} className={btnDark}>
+                                            <button onClick={() => openStatus(o)} className={btnDark} type="button">
                                                 Change Status
                                             </button>
                                         </div>
@@ -280,19 +350,20 @@ export default function Orders() {
             {/* View Modal */}
             {viewOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-black/70" onClick={() => setViewOpen(false)} />
+                    <div className="absolute inset-0 bg-black/70" onClick={closeView} />
 
                     <div className="relative w-full max-w-3xl bg-zinc-900 border border-white/10 text-white rounded-2xl shadow-xl p-5">
                         <div className="flex items-center justify-between mb-4">
                             <div>
-                                <h3 className="font-semibold text-lg">  Order #{viewOrder?.order_code ?? viewOrder?.id ?? ""}
+                                <h3 className="font-semibold text-lg">
+                                    Order #{viewOrder?.order_code ?? viewOrder?.id ?? ""}
                                 </h3>
                                 <div className="mt-1">
                                     <StatusBadge status={viewOrder?.status} />
                                 </div>
                             </div>
 
-                            <button onClick={() => setViewOpen(false)} className="text-white/70 hover:text-white">
+                            <button onClick={closeView} className="text-white/70 hover:text-white" type="button">
                                 ✕
                             </button>
                         </div>
@@ -364,6 +435,43 @@ export default function Orders() {
                                     </div>
                                 </div>
 
+                                {/* ✅ Tracking (Option B: editable) */}
+                                <div className="mt-4 bg-white/5 border border-white/10 rounded-xl p-4">
+                                    <div className="text-white/60 text-xs">Tracking code</div>
+
+                                    <div className="flex items-center gap-2 mt-2">
+                                        <input
+                                            className={inputCls}
+                                            value={trackingInput}
+                                            onChange={(e) => setTrackingInput(e.target.value)}
+                                            placeholder="Enter tracking code..."
+                                            disabled={trackingSaving}
+                                        />
+
+                                        <button
+                                            onClick={saveTracking}
+                                            disabled={trackingSaving}
+                                            className={btnPrimary}
+                                            type="button"
+                                        >
+                                            {trackingSaving ? "Saving..." : "Save"}
+                                        </button>
+                                    </div>
+
+                                    {trackingErr && (
+                                        <div className="mt-2 text-xs text-red-300">{trackingErr}</div>
+                                    )}
+
+                                    <div className="text-white/60 text-xs mt-3">Shipping method</div>
+                                    <div className="mt-1">{viewOrder?.shipping_method ?? "-"}</div>
+
+                                    {viewOrder?.tracking_code && (
+                                        <div className="mt-2 text-xs text-emerald-300">
+                                            Current: {viewOrder.tracking_code}
+                                        </div>
+                                    )}
+                                </div>
+
                                 {/* Items */}
                                 <div className="mt-5">
                                     <h4 className="font-semibold mb-2">Items</h4>
@@ -410,7 +518,7 @@ export default function Orders() {
                                 </div>
 
                                 <div className="flex justify-end mt-5">
-                                    <button className={btnPrimary} onClick={() => setViewOpen(false)}>
+                                    <button className={btnPrimary} onClick={closeView} type="button">
                                         Close
                                     </button>
                                 </div>
@@ -427,9 +535,15 @@ export default function Orders() {
 
                     <div className="relative w-full max-w-lg bg-zinc-900 border border-white/10 text-white rounded-2xl shadow-xl p-5">
                         <div className="flex items-center justify-between mb-4">
-                            <h3 className="font-semibold text-lg">Change Status (Order #{statusOrder?.id})</h3>
+                            <h3 className="font-semibold text-lg">
+                                Change Status (Order #{statusOrder?.order_code ?? statusOrder?.id})
+                            </h3>
 
-                            <button onClick={() => setStatusOpen(false)} className="text-white/70 hover:text-white">
+                            <button
+                                onClick={() => setStatusOpen(false)}
+                                className="text-white/70 hover:text-white"
+                                type="button"
+                            >
                                 ✕
                             </button>
                         </div>
@@ -437,18 +551,25 @@ export default function Orders() {
                         <form onSubmit={handleUpdateStatus} className="space-y-4">
                             <div>
                                 <label className={labelCls}>New Status</label>
+
                                 <select
                                     className={inputCls}
                                     value={newStatus}
                                     onChange={(e) => setNewStatus(e.target.value)}
                                 >
-                                    {STATUS.map((s) => (
-                                        <option key={s} value={s}>{s}</option>
+                                    {allowedStatusOptions.map((s) => (
+                                        <option key={s} value={s}>
+                                            {s}
+                                        </option>
                                     ))}
                                 </select>
 
                                 <div className="mt-2">
                                     <StatusBadge status={newStatus} />
+                                </div>
+
+                                <div className="text-xs text-white/50 mt-2">
+                                    Allowed: {allowedStatusOptions.join(" → ")}
                                 </div>
                             </div>
 
@@ -456,12 +577,12 @@ export default function Orders() {
                                 <button
                                     type="button"
                                     onClick={() => setStatusOpen(false)}
-                                    className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white hover:bg-white/10 transition"
+                                    className={btnGhost}
                                 >
                                     Cancel
                                 </button>
 
-                                <button type="submit" className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white hover:bg-white/10 transition" disabled={saving}>
+                                <button type="submit" className={btnPrimary} disabled={saving}>
                                     {saving ? "Saving..." : "Save"}
                                 </button>
                             </div>

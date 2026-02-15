@@ -24,5 +24,11 @@ class Product extends Model
     protected $casts = [
         'is_active' => 'boolean',
     ];
+
+    public function wishedBy()
+    {
+        return $this->belongsToMany(\App\Models\User::class, 'wishlists')->withTimestamps();
+    }
+
 }
 

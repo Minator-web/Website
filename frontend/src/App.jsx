@@ -21,6 +21,8 @@ import Profile from "./pages/Profile";
 
 import AdminRoute from "./routes/AdminRoute";
 import AuthRoute from "./routes/AuthRoute";
+import NotFound from "./pages/NotFound.jsx";
+import Wishlist from "./pages/Wishlist.jsx";
 
 export default function App() {
     return (
@@ -31,6 +33,7 @@ export default function App() {
                 <Route path="/" element={<Shop />} />
                 <Route path="/cart" element={<CartPage />} />
                 <Route path="/products/:id" element={<ProductDetails />} />
+                <Route path="/wishlist" element={<Wishlist />} />
 
                 {/* ---------- User Protected ---------- */}
                 <Route
@@ -113,7 +116,7 @@ export default function App() {
                     <Route path="orders" element={<Orders />} />
                 </Route>
 
-                <Route path="*" element={<Navigate to="/" replace />} />
+                <Route path="*" element={<NotFound />} />
 
             </Routes>
         </BrowserRouter>

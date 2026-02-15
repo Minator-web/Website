@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { api } from "../../lib/api";
+import Skeleton from "../../components/Skeleton";
+import { useToast } from "../../context/ToastContext";
 
 const inputCls =
     "w-full rounded-lg bg-zinc-950 border border-white/10 text-white placeholder:text-white/40 p-2 " +
@@ -8,27 +10,89 @@ const inputCls =
 const labelCls = "block text-sm mb-1 text-white/80";
 
 const btnPrimary =
-    "px-4 py-2 rounded-lg bg-black text-white font-medium hover:opacity-90 transition disabled:opacity-60";
+    "px-4 py-2 rounded-lg bg-white text-black font-medium hover:opacity-90 transition disabled:opacity-60";
 
 const btnDark =
-    "px-3 py-2 rounded-lg bg-black text-white border border-white/10 hover:bg-white/5 transition";
+    "px-3 py-2 rounded-lg bg-black text-white border border-white/10 hover:bg-white/5 transition disabled:opacity-60";
 
 const btnDanger =
-    "px-3 py-2 rounded-lg bg-red-600 text-white hover:opacity-90 transition";
+    "px-3 py-2 rounded-lg bg-red-600 text-white hover:opacity-90 transition disabled:opacity-60";
+
+const btnSoft =
+    "px-3 py-2 rounded-lg bg-white/10 border border-white/10 text-white hover:bg-white/15 transition disabled:opacity-60";
+
+function TableSkeleton() {
+    return (
+        <div className="overflow-auto rounded-xl border border-white/10">
+            <table className="min-w-225 w-full text-sm text-white/90">
+                <thead>
+                <tr className="text-left border-b border-white/10 text-white/70 bg-white/5">
+                    <th className="py-3 px-3">ID</th>
+                    <th className="py-3 px-3">Image</th>
+                    <th className="py-3 px-3">Title</th>
+                    <th className="py-3 px-3">Price</th>
+                    <th className="py-3 px-3">Stock</th>
+                    <th className="py-3 px-3">Active</th>
+                    <th className="py-3 px-3 w-40">Actions</th>
+                </tr>
+                </thead>
+                <tbody>
+                {[1, 2, 3, 4, 5].map((k) => (
+                    <tr key={k} className="border-b border-white/10">
+                        <td className="py-3 px-3">
+                            <Skeleton className="h-4 w-10" />
+                        </td>
+                        <td className="py-3 px-3">
+                            <Skeleton className="h-10 w-10 rounded-lg" />
+                        </td>
+                        <td className="py-3 px-3">
+                            <Skeleton className="h-4 w-48" />
+                        </td>
+                        <td className="py-3 px-3">
+                            <Skeleton className="h-4 w-20" />
+                        </td>
+                        <td className="py-3 px-3">
+                            <Skeleton className="h-4 w-12" />
+                        </td>
+                        <td className="py-3 px-3">
+                            <Skeleton className="h-6 w-20 rounded-full" />
+                        </td>
+                        <td className="py-3 px-3">
+                            <div className="flex gap-2">
+                                <Skeleton className="h-9 w-16 rounded-lg" />
+                                <Skeleton className="h-9 w-16 rounded-lg" />
+                            </div>
+                        </td>
+                    </tr>
+                ))}
+                </tbody>
+            </table>
+        </div>
+    );
+}
+
+function getFirstValidationError(errors) {
+    if (!errors || typeof errors !== "object") return "";
+    const firstKey = Object.keys(errors)[0];
+    const firstMsg = Array.isArray(errors[firstKey]) ? errors[firstKey][0] : "";
+    return firstMsg || "";
+}
 
 export default function Products() {
+    const toast = useToast();
+
     const [items, setItems] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [err, setErr] = useState("");
+    const [loadFailed, setLoadFailed] = useState(false);
 
-    // فرم افزودن محصول
+    // Create form
     const [title, setTitle] = useState("");
     const [price, setPrice] = useState("");
     const [stock, setStock] = useState("");
     const [description, setDescription] = useState("");
     const [isActive, setIsActive] = useState(true);
     const [image, setImage] = useState(null);
-
+    const [createLoading, setCreateLoading] = useState(false);
 
     // Edit modal
     const [editOpen, setEditOpen] = useState(false);
@@ -39,30 +103,42 @@ export default function Products() {
     const [editDescription, setEditDescription] = useState("");
     const [editIsActive, setEditIsActive] = useState(true);
     const [editImage, setEditImage] = useState(null);
+    const [updateLoading, setUpdateLoading] = useState(false);
 
+    // Delete loading per row
+    const [deletingId, setDeletingId] = useState(null);
 
+    const countLabel = useMemo(() => `${items.length} items`, [items.length]);
 
-    async function load() {
-        setErr("");
+    const load = useCallback(async () => {
         setLoading(true);
+        setLoadFailed(false);
+
         try {
-            const data = await api("/api/admin/products"); // paginate برمیگردونه
-            setItems(data?.data || []);
+            const data = await api("/api/admin/products"); // paginate
+            setItems(Array.isArray(data?.data) ? data.data : []);
         } catch (e) {
-            setErr(e?.message || "Failed to load products");
+            setItems([]);
+            setLoadFailed(true);
+            toast.push({
+                type: "error",
+                title: "Failed to load products",
+                message: e?.message || "Failed to load products",
+            });
         } finally {
             setLoading(false);
         }
-    }
+    }, [toast]);
 
     useEffect(() => {
         load();
-    }, []);
+    }, [load]);
 
     async function handleCreate(e) {
         e.preventDefault();
-        setErr("");
+        if (createLoading) return;
 
+        setCreateLoading(true);
         try {
             const fd = new FormData();
             fd.append("title", title);
@@ -77,6 +153,12 @@ export default function Products() {
                 body: fd,
             });
 
+            toast.push({
+                type: "success",
+                title: "Product created",
+                message: "New product has been created successfully.",
+            });
+
             setTitle("");
             setPrice("");
             setStock("");
@@ -84,20 +166,16 @@ export default function Products() {
             setIsActive(true);
             setImage(null);
 
-            load();
-        } catch (e) {
-            if (e?.errors) {
-                const firstKey = Object.keys(e.errors)[0];
-                setErr(e.errors[firstKey]?.[0] || e.message || "Create failed");
-            } else {
-                setErr(e?.message || "Create failed");
-            }
+            await load();
+        } catch (e2) {
+            const msg = getFirstValidationError(e2?.errors) || e2?.message || "Create failed";
+            toast.push({ type: "error", title: "Create failed", message: msg });
+        } finally {
+            setCreateLoading(false);
         }
     }
 
-
     function openEdit(p) {
-        setErr("");
         setEditId(p.id);
         setEditTitle(p.title ?? "");
         setEditPrice(String(p.price ?? ""));
@@ -108,10 +186,31 @@ export default function Products() {
         setEditImage(null);
     }
 
+    function closeEdit() {
+        if (updateLoading) return;
+        setEditOpen(false);
+        setEditId(null);
+        setEditImage(null);
+    }
+
+    useEffect(() => {
+        if (!editOpen) return;
+
+        function onKeyDown(e) {
+            if (e.key === "Escape") closeEdit();
+        }
+
+        window.addEventListener("keydown", onKeyDown);
+        return () => window.removeEventListener("keydown", onKeyDown);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [editOpen, updateLoading]);
+
     async function handleUpdate(e) {
         e.preventDefault();
-        setErr("");
+        if (!editId) return;
+        if (updateLoading) return;
 
+        setUpdateLoading(true);
         try {
             const fd = new FormData();
             fd.append("title", editTitle);
@@ -127,29 +226,46 @@ export default function Products() {
                 headers: { "X-HTTP-Method-Override": "PUT" },
             });
 
-            setEditOpen(false);
-            setEditId(null);
-            load();
-        } catch (e) {
-            if (e?.errors) {
-                const firstKey = Object.keys(e.errors)[0];
-                setErr(e.errors[firstKey]?.[0] || e.message || "Update failed");
-            } else {
-                setErr(e?.message || "Update failed");
-            }
+            toast.push({
+                type: "success",
+                title: "Product updated",
+                message: "Changes saved successfully.",
+            });
+
+            closeEdit();
+            await load();
+        } catch (e2) {
+            const msg = getFirstValidationError(e2?.errors) || e2?.message || "Update failed";
+            toast.push({ type: "error", title: "Update failed", message: msg });
+        } finally {
+            setUpdateLoading(false);
         }
     }
 
-
-
     async function handleDelete(id) {
-        if (!confirm("Delete this product?")) return;
-        setErr("");
+        if (deletingId) return;
+        const ok = window.confirm("Delete this product?");
+        if (!ok) return;
+
+        setDeletingId(id);
         try {
             await api(`/api/admin/products/${id}`, { method: "DELETE" });
+
+            toast.push({
+                type: "success",
+                title: "Product deleted",
+                message: "Product removed successfully.",
+            });
+
             setItems((prev) => prev.filter((x) => x.id !== id));
-        } catch (e) {
-            setErr(e?.message || "Delete failed");
+        } catch (e2) {
+            toast.push({
+                type: "error",
+                title: "Delete failed",
+                message: e2?.message || "Delete failed",
+            });
+        } finally {
+            setDeletingId(null);
         }
     }
 
@@ -159,22 +275,15 @@ export default function Products() {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-extrabold text-white">Products</h1>
-                    <p className="text-white/50 text-sm mt-1">
-                        Create, edit and manage your products
-                    </p>
+                    <p className="text-white/50 text-sm mt-1">Create, edit and manage your products</p>
                 </div>
 
-                <button onClick={load} className={btnDark}>
-                    Refresh
-                </button>
+                <div className="flex items-center gap-2">
+                    <button onClick={load} className={btnDark} disabled={loading}>
+                        {loading ? "Loading..." : "Refresh"}
+                    </button>
+                </div>
             </div>
-
-            {/* Error */}
-            {err && (
-                <div className="bg-red-500/15 border border-red-500/30 text-red-200 p-3 rounded-lg">
-                    {err}
-                </div>
-            )}
 
             {/* Create Form */}
             <form
@@ -195,6 +304,7 @@ export default function Products() {
                             onChange={(e) => setTitle(e.target.value)}
                             placeholder="Product title"
                             required
+                            disabled={createLoading}
                         />
                     </div>
 
@@ -210,6 +320,7 @@ export default function Products() {
                             step="1"
                             inputMode="numeric"
                             required
+                            disabled={createLoading}
                         />
                     </div>
 
@@ -225,6 +336,7 @@ export default function Products() {
                             step="1"
                             inputMode="numeric"
                             required
+                            disabled={createLoading}
                         />
                     </div>
 
@@ -235,6 +347,7 @@ export default function Products() {
                             checked={isActive}
                             onChange={(e) => setIsActive(e.target.checked)}
                             className="h-4 w-4"
+                            disabled={createLoading}
                         />
                         <label htmlFor="active" className="text-sm text-white/80">
                             Active
@@ -250,6 +363,7 @@ export default function Products() {
                         onChange={(e) => setDescription(e.target.value)}
                         placeholder="Optional..."
                         rows={3}
+                        disabled={createLoading}
                     />
                 </div>
 
@@ -260,12 +374,14 @@ export default function Products() {
                         type="file"
                         accept="image/*"
                         onChange={(e) => setImage(e.target.files?.[0] || null)}
+                        disabled={createLoading}
                     />
                 </div>
 
-
                 <div className="pt-1">
-                    <button className={btnPrimary}>Create</button>
+                    <button className={btnPrimary} disabled={createLoading}>
+                        {createLoading ? "Creating..." : "Create"}
+                    </button>
                 </div>
             </form>
 
@@ -273,13 +389,24 @@ export default function Products() {
             <div className="bg-zinc-900/70 border border-white/10 rounded-2xl shadow p-5">
                 <div className="flex items-center justify-between mb-4">
                     <h2 className="font-semibold text-white">List</h2>
-                    <span className="text-sm text-white/50">{items.length} items</span>
+                    <span className="text-sm text-white/50">{countLabel}</span>
                 </div>
 
                 {loading ? (
-                    <div className="text-white/70">Loading...</div>
+                    <TableSkeleton />
+                ) : loadFailed ? (
+                    <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+                        <div className="text-white font-semibold">Could not load products</div>
+                        <div className="text-white/60 mt-2 text-sm">Please try again.</div>
+                        <button onClick={load} className={`${btnDark} mt-4`} type="button">
+                            Retry
+                        </button>
+                    </div>
                 ) : items.length === 0 ? (
-                    <div className="text-white/60">No products yet.</div>
+                    <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+                        <div className="text-white font-semibold">No products yet</div>
+                        <div className="text-white/60 mt-2 text-sm">Create your first product using the form above.</div>
+                    </div>
                 ) : (
                     <div className="overflow-auto rounded-xl border border-white/10">
                         <table className="min-w-225 w-full text-sm text-white/90">
@@ -292,62 +419,62 @@ export default function Products() {
                                 <th className="py-3 px-3">Stock</th>
                                 <th className="py-3 px-3">Active</th>
                                 <th className="py-3 px-3 w-40">Actions</th>
-
                             </tr>
                             </thead>
 
                             <tbody>
-                            {items.map((p) => (
-                                <tr
-                                    key={p.id}
-                                    className="border-b border-white/10 hover:bg-white/5 transition"
-                                >
-                                    <td className="py-3 px-3">{p.id}</td>
-                                    <td className="py-3 px-3">
-                                        {p.image_url ? (
-                                            <img
-                                                src={p.image_url}
-                                                alt=""
-                                                className="h-10 w-10 rounded-lg object-cover border border-white/10"
-                                            />
-                                        ) : (
-                                            <span className="text-white/40 text-xs">-</span>
-                                        )}
-                                    </td>
+                            {items.map((p) => {
+                                const isDeleting = deletingId === p.id;
+                                return (
+                                    <tr key={p.id} className="border-b border-white/10 hover:bg-white/5 transition">
+                                        <td className="py-3 px-3">{p.id}</td>
 
-                                    <td className="py-3 px-3 font-medium">{p.title}</td>
-                                    <td className="py-3 px-3">{p.price}</td>
-                                    <td className="py-3 px-3">{p.stock}</td>
-                                    <td className="py-3 px-3">
-                                        {p.is_active ? (
-                                            <span className="px-2 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-200 text-xs">
-                          Active
-                        </span>
-                                        ) : (
-                                            <span className="px-2 py-1 rounded-full bg-zinc-500/15 border border-white/10 text-white/70 text-xs">
-                          Disabled
-                        </span>
-                                        )}
-                                    </td>
+                                        <td className="py-3 px-3">
+                                            {p.image_url ? (
+                                                <img
+                                                    src={p.image_url}
+                                                    alt=""
+                                                    className="h-10 w-10 rounded-lg object-cover border border-white/10"
+                                                />
+                                            ) : (
+                                                <span className="text-white/40 text-xs">-</span>
+                                            )}
+                                        </td>
 
-                                    <td className="py-3 px-3">
-                                        <div className="flex gap-2">
-                                            <button
-                                                onClick={() => openEdit(p)}
-                                                className="px-3 py-2 rounded-lg bg-white/10 border border-white/10 text-white hover:bg-white/15 transition"
-                                            >
-                                                Edit
-                                            </button>
-                                            <button
-                                                onClick={() => handleDelete(p.id)}
-                                                className={btnDanger}
-                                            >
-                                                Delete
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
+                                        <td className="py-3 px-3 font-medium">{p.title}</td>
+                                        <td className="py-3 px-3">{p.price}</td>
+                                        <td className="py-3 px-3">{p.stock}</td>
+
+                                        <td className="py-3 px-3">
+                                            {p.is_active ? (
+                                                <span className="px-2 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-200 text-xs">
+                            Active
+                          </span>
+                                            ) : (
+                                                <span className="px-2 py-1 rounded-full bg-zinc-500/15 border border-white/10 text-white/70 text-xs">
+                            Disabled
+                          </span>
+                                            )}
+                                        </td>
+
+                                        <td className="py-3 px-3">
+                                            <div className="flex gap-2">
+                                                <button onClick={() => openEdit(p)} className={btnSoft} disabled={isDeleting}>
+                                                    Edit
+                                                </button>
+
+                                                <button
+                                                    onClick={() => handleDelete(p.id)}
+                                                    className={btnDanger}
+                                                    disabled={isDeleting}
+                                                >
+                                                    {isDeleting ? "Deleting..." : "Delete"}
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                             </tbody>
                         </table>
                     </div>
@@ -358,18 +485,13 @@ export default function Products() {
             {editOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                     {/* overlay */}
-                    <div
-                        className="absolute inset-0 bg-black/70"
-                        onClick={() => setEditOpen(false)}
-                    />
+                    <div className="absolute inset-0 bg-black/70" onClick={closeEdit} />
 
                     {/* modal */}
-                    <div className="bg-zinc-900/70 border border-white/10 rounded-2xl shadow p-5 space-y-4 w-full max-w-xl relative">                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="font-semibold text-lg">Edit Product</h3>
-                            <button
-                                onClick={() => setEditOpen(false)}
-                                className="text-white/70 hover:text-white"
-                            >
+                    <div className="bg-zinc-900/70 border border-white/10 rounded-2xl shadow p-5 space-y-4 w-full max-w-xl relative">
+                        <div className="flex items-center justify-between mb-2">
+                            <h3 className="font-semibold text-lg text-white">Edit Product</h3>
+                            <button onClick={closeEdit} className="text-white/70 hover:text-white" disabled={updateLoading}>
                                 ✕
                             </button>
                         </div>
@@ -382,6 +504,7 @@ export default function Products() {
                                     value={editTitle}
                                     onChange={(e) => setEditTitle(e.target.value)}
                                     required
+                                    disabled={updateLoading}
                                 />
                             </div>
 
@@ -395,6 +518,7 @@ export default function Products() {
                                         type="number"
                                         min="0"
                                         required
+                                        disabled={updateLoading}
                                     />
                                 </div>
 
@@ -407,6 +531,7 @@ export default function Products() {
                                         type="number"
                                         min="0"
                                         required
+                                        disabled={updateLoading}
                                     />
                                 </div>
                             </div>
@@ -418,6 +543,7 @@ export default function Products() {
                                     checked={editIsActive}
                                     onChange={(e) => setEditIsActive(e.target.checked)}
                                     className="h-4 w-4"
+                                    disabled={updateLoading}
                                 />
                                 <label htmlFor="editActive" className="text-sm text-white/80">
                                     Active
@@ -431,8 +557,10 @@ export default function Products() {
                                     value={editDescription}
                                     onChange={(e) => setEditDescription(e.target.value)}
                                     rows={3}
+                                    disabled={updateLoading}
                                 />
                             </div>
+
                             <div>
                                 <label className={labelCls}>New Image (optional)</label>
                                 <input
@@ -440,19 +568,22 @@ export default function Products() {
                                     type="file"
                                     accept="image/*"
                                     onChange={(e) => setEditImage(e.target.files?.[0] || null)}
+                                    disabled={updateLoading}
                                 />
                             </div>
-
 
                             <div className="flex items-center justify-end gap-2 pt-2">
                                 <button
                                     type="button"
-                                    onClick={() => setEditOpen(false)}
-                                    className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white hover:bg-white/10 transition"
+                                    onClick={closeEdit}
+                                    className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white hover:bg-white/10 transition disabled:opacity-60"
+                                    disabled={updateLoading}
                                 >
                                     Cancel
                                 </button>
-                                <button className={btnPrimary}>Save</button>
+                                <button className={btnPrimary} disabled={updateLoading}>
+                                    {updateLoading ? "Saving..." : "Save"}
+                                </button>
                             </div>
                         </form>
                     </div>

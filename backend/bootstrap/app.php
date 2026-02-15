@@ -18,5 +18,62 @@ return Application::configure(basePath: dirname(__DIR__))
     })
 
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+
+        $exceptions->render(function (\Throwable $e, \Illuminate\Http\Request $request) {
+
+            if ($request->is('api/*') || $request->expectsJson()) {
+
+                // 422 Validation
+                if ($e instanceof \Illuminate\Validation\ValidationException) {
+                    return response()->json([
+                        'message' => $e->getMessage(),
+                        'errors' => $e->errors(),
+                    ], 422);
+                }
+
+                // 401 Unauthenticated
+                if ($e instanceof \Illuminate\Auth\AuthenticationException) {
+                    return response()->json([
+                        'message' => 'Unauthenticated',
+                    ], 401);
+                }
+
+                // 403/404/429/... Http exceptions
+                if ($e instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface) {
+                    $status = $e->getStatusCode();
+
+                    $message = $e->getMessage() ?: match ($status) {
+                        403 => 'Forbidden',
+                        404 => 'Not Found',
+                        429 => 'Too Many Requests',
+                        default => 'Request failed',
+                    };
+
+                    return response()->json([
+                        'message' => $message,
+                    ], $status);
+                }
+
+                // 500+ سایر خطاها
+                \Log::error('API Exception', [
+                    'url' => $request->fullUrl(),
+                    'method' => $request->method(),
+                    'user_id' => optional($request->user())->id,
+                    'exception' => get_class($e),
+                    'message' => $e->getMessage(),
+                ]);
+
+                $message = config('app.debug')
+                    ? ($e->getMessage() ?: 'Server error')
+                    : 'Server error';
+
+                return response()->json([
+                    'message' => $message,
+                ], 500);
+            }
+
+            // اگر API نبود، رندر پیش‌فرض ادامه پیدا کند
+            return null;
+        });
+
     })->create();

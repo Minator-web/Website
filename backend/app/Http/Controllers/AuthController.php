@@ -43,9 +43,6 @@ class AuthController extends Controller
             return response()->json(['message' => 'Invalid credentials'], 401);
         }
 
-        // (اختیاری) حذف توکن‌های قبلی
-        // $user->tokens()->delete();
-
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
@@ -61,7 +58,6 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
-        // توکنی که همین درخواست باهاش اومده رو حذف می‌کنه
         $request->user()->currentAccessToken()->delete();
 
         return response()->json([

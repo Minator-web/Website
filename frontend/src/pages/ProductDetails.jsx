@@ -1,36 +1,138 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { useCart } from "../context/CartContext";
 import UserLayout from "../layouts/UserLayout";
+import Skeleton from "../components/Skeleton";
+import { useToast } from "../context/ToastContext";
+import { useDrawer } from "../context/DrawerContext";
+import { useWishlist } from "../context/WishlistContext";
+
+function ProductDetailsSkeleton() {
+    return (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-zinc-900/70 border border-white/10 rounded-2xl p-6">
+            <div>
+                <Skeleton className="w-full h-80 rounded-2xl" />
+            </div>
+
+            <div className="space-y-4">
+                <div className="space-y-2">
+                    <Skeleton className="h-8 w-56" />
+                    <Skeleton className="h-4 w-32" />
+                </div>
+
+                <div className="space-y-2">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-11/12" />
+                    <Skeleton className="h-4 w-10/12" />
+                </div>
+
+                <Skeleton className="h-10 w-40" />
+                <Skeleton className="h-12 w-full rounded-xl" />
+                <Skeleton className="h-4 w-24" />
+            </div>
+        </div>
+    );
+}
 
 export default function ProductDetails() {
     const { id } = useParams();
     const { add } = useCart();
+    const toast = useToast();
+    const { isLiked, toggle } = useWishlist();
+
+
+    const token = localStorage.getItem("token");
+
+    const { openCart, toggleCart } = useDrawer();
+    const showCart = openCart || toggleCart;
 
     const [p, setP] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [err, setErr] = useState("");
+    const [loadFailed, setLoadFailed] = useState(false);
 
-    async function load() {
-        setErr("");
+    const [liked, setLiked] = useState(false);
+    const [likeLoading, setLikeLoading] = useState(false);
+
+    const load = useCallback(async () => {
         setLoading(true);
+        setLoadFailed(false);
         try {
             const res = await api(`/api/products/${id}`);
             setP(res?.data || res);
         } catch (e) {
-            // اگر 404 باشه معمولاً message میاد یا خالیه
-            setErr(e?.message || "Product not found");
             setP(null);
+            setLoadFailed(true);
+            toast.push({
+                type: "error",
+                title: "Product load failed",
+                message: e?.message || "Product not found",
+            });
         } finally {
             setLoading(false);
         }
-    }
+    }, [id, toast]);
 
     useEffect(() => {
         load();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [id]);
+    }, [load]);
+
+    // ✅ init like
+    useEffect(() => {
+        async function initLike() {
+            if (!token || !p?.id) return;
+            try {
+                const ids = await api("/api/wishlist/ids");
+                const s = new Set((ids || []).map(Number));
+                setLiked(s.has(Number(p.id)));
+            } catch {
+                // ignore
+            }
+        }
+        initLike();
+    }, [token, p?.id]);
+
+    const isActive = !!p?.is_active;
+    const stock = Number(p?.stock ?? 0);
+
+    async function toggleLike() {
+        if (!p?.id) return;
+
+        try {
+            const likedNow = await toggle(p.id);
+            toast.push({
+                type: likedNow ? "success" : "info",
+                message: likedNow ? "Added to WishList" : "Deleted From WishList",
+            });
+        } catch (e) {
+            toast.push({ type: "error", message: e?.message || "Error in Wishlist" });
+        }
+    }
+
+    function addToCart() {
+        if (!p) return;
+
+        if (!isActive) {
+            toast.push({ type: "error", title: "Unavailable", message: "This product is not active." });
+            return;
+        }
+
+        if (stock <= 0) {
+            toast.push({ type: "error", title: "Out of stock", message: "This product is out of stock." });
+            return;
+        }
+
+        add({ product_id: p.id, title: p.title, price: p.price });
+
+        toast.push({
+            type: "success",
+            title: "Added to cart",
+            message: "Product added to your cart.",
+        });
+
+        // ✅ باز کردن دراور کارت (هرکدوم موجود بود)
+        if (showCart) showCart();
+    }
 
     return (
         <UserLayout>
@@ -42,14 +144,26 @@ export default function ProductDetails() {
                     </Link>
                 </div>
 
-                {err && (
-                    <div className="text-red-200 bg-red-500/15 border border-red-500/30 p-3 rounded-lg">
-                        {err}
-                    </div>
-                )}
-
                 {loading ? (
-                    <div className="text-white/70">Loading...</div>
+                    <ProductDetailsSkeleton />
+                ) : loadFailed ? (
+                    <div className="bg-zinc-900/70 border border-white/10 rounded-2xl p-6">
+                        <div className="text-xl font-bold">Could not load product</div>
+                        <div className="mt-2 text-white/60">Please try again.</div>
+
+                        <div className="mt-5 flex items-center gap-3">
+                            <button
+                                onClick={load}
+                                className="px-4 py-2 rounded-lg bg-white text-black font-semibold"
+                                type="button"
+                            >
+                                Retry
+                            </button>
+                            <Link to="/" className="text-white/80 underline">
+                                Back to shop
+                            </Link>
+                        </div>
+                    </div>
                 ) : !p ? (
                     <div className="bg-zinc-900/70 border border-white/10 rounded-2xl p-6 text-white/70">
                         Product not found.
@@ -76,7 +190,8 @@ export default function ProductDetails() {
                             <div>
                                 <h2 className="text-2xl font-extrabold">{p.title}</h2>
                                 <div className="text-white/60 mt-1">
-                                    Stock: <span className="text-white">{p.stock}</span>
+                                    Stock: <span className="text-white">{stock}</span>
+                                    {!isActive ? <span className="ml-2 text-red-200">(inactive)</span> : null}
                                 </div>
                             </div>
 
@@ -92,17 +207,28 @@ export default function ProductDetails() {
                                 {Number(p.price).toLocaleString()}
                             </div>
 
-                            <button
-                                disabled={!p.is_active || p.stock <= 0}
-                                onClick={() => add({ product_id: p.id, title: p.title, price: p.price })}
-                                className="w-full px-4 py-3 rounded-xl bg-black text-white font-semibold disabled:opacity-50 border border-white/10 hover:bg-white/5"
-                            >
-                                Add to cart
-                            </button>
+                            <div className="flex gap-2">
+                                <button
+                                    disabled={!isActive || stock <= 0}
+                                    onClick={addToCart}
+                                    className="w-full px-4 py-3 rounded-xl bg-black text-white font-semibold disabled:opacity-50 border border-white/10 hover:bg-white/5"
+                                    type="button"
+                                >
+                                    {stock <= 0 ? "Out of stock" : !isActive ? "Unavailable" : "Add to cart"}
+                                </button>
 
-                            <div className="text-xs text-white/40">
-                                Product ID: {p.id}
+                                <button
+                                    onClick={toggleLike}
+                                    disabled={likeLoading}
+                                    className="px-4 py-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-60"
+                                    title="Wishlist"
+                                    type="button"
+                                >
+                                    {liked ? "❤️" : "🤍"}
+                                </button>
                             </div>
+
+                            <div className="text-xs text-white/40">Product ID: {p.id}</div>
                         </div>
                     </div>
                 )}
