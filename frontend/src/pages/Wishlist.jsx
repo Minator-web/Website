@@ -66,12 +66,11 @@ export default function Wishlist() {
         e.stopPropagation();
 
         try {
-            // از همون toggle استفاده می‌کنیم
             await api(`/api/wishlist/${productId}/toggle`, { method: "POST" });
             setItems((prev) => prev.filter((p) => p.id !== productId));
-            toast.push({ type: "info", message: "از علاقه‌مندی‌ها حذف شد" });
+            toast.push({ type: "info", message: "Deleted from wishlist" });
         } catch (e2) {
-            toast.push({ type: "error", message: e2?.message || "خطا در حذف" });
+            toast.push({ type: "error", message: e2?.message || "Delete failed" });
         }
     }
 

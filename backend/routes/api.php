@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\WishlistController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -42,15 +43,22 @@ Route::middleware(['auth:sanctum', 'is_admin', 'throttle:60,1'])
     ->prefix('admin')
     ->group(function () {
 
-        Route::patch('orders/{order}/tracking', [OrderController::class, 'setTracking']);
+        Route::get('dashboard', [DashboardController::class, 'index']);
 
         Route::apiResource('products', ProductController::class);
 
-        Route::get('dashboard', [DashboardController::class, 'index']);
-
         Route::apiResource('orders', OrderController::class)
             ->only(['index', 'show', 'update', 'destroy']);
+
+        Route::patch('orders/{order}/tracking', [OrderController::class, 'setTracking']);
+
+        // فقط سوپر ادمین:
+        Route::middleware('is_super_admin')->group(function () {
+            Route::get('users', [UserController::class, 'index']);
+            Route::patch('users/{user}/role', [UserController::class, 'setRole']);
+        });
     });
+
 
 
 /*

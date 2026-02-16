@@ -8,6 +8,7 @@ import Checkout from "./pages/Checkout";
 import OrderSuccess from "./pages/OrderSuccess";
 import OrderDetails from "./pages/OrderDetails";
 import GuestRoute from "./routes/GuestRoute";
+import Users from "./pages/admin/Users";
 
 
 import AdminLayout from "./layouts/AdminLayout";
@@ -33,7 +34,6 @@ export default function App() {
                 <Route path="/" element={<Shop />} />
                 <Route path="/cart" element={<CartPage />} />
                 <Route path="/products/:id" element={<ProductDetails />} />
-                <Route path="/wishlist" element={<Wishlist />} />
 
                 {/* ---------- User Protected ---------- */}
                 <Route
@@ -45,6 +45,14 @@ export default function App() {
                     }
                 />
 
+                <Route
+                    path="/wishlist"
+                    element={
+                        <AuthRoute>
+                            <Wishlist />
+                        </AuthRoute>
+                    }
+                />
 
                 <Route
                     path="/my-orders"
@@ -111,6 +119,7 @@ export default function App() {
                         </AdminRoute>
                     }
                 >
+                    <Route path="users" element={<Users />} />
                     <Route index element={<Dashboard />} />
                     <Route path="products" element={<Products />} />
                     <Route path="orders" element={<Orders />} />

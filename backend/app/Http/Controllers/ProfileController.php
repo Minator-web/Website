@@ -14,8 +14,6 @@ class ProfileController extends Controller
 
         $data = $request->validate([
             'name'  => ['required', 'string', 'max:255'],
-            // اگر خواستی ایمیل هم قابل تغییر باشه:
-            // 'email' => ['required','email','max:255','unique:users,email,' . $user->id],
         ]);
 
         $user->update($data);
@@ -25,21 +23,24 @@ class ProfileController extends Controller
 
     public function changePassword(Request $request)
     {
-        $user = $request->user();
-
-        $data = $request->validate([
-            'current_password' => ['required'],
-            'new_password' => ['required', Password::min(6)],
+        $request->validate([
+            'current_password' => ['required', 'string'],
+            'new_password' => ['required', 'string', 'min:8'],
         ]);
 
-        if (!Hash::check($data['current_password'], $user->password)) {
+        $user = $request->user();
+
+        if (!Hash::check($request->current_password, $user->password)) {
             return response()->json(['message' => 'Current password is incorrect'], 422);
         }
 
-        $user->update([
-            'password' => Hash::make($data['new_password']),
-        ]);
+        if (Hash::check($request->new_password, $user->password)) {
+            return response()->json(['message' => 'New password cannot be the same as current password'], 422);
+        }
 
-        return response()->json(['message' => 'Password updated']);
+        $user->password = $request->new_password;
+        $user->save();
+
+        return response()->json(['message' => 'Password changed']);
     }
 }

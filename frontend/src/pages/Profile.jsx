@@ -13,7 +13,7 @@ const card =
     "bg-zinc-900/70 border border-white/10 rounded-2xl p-6";
 
 const btn =
-    "px-5 py-2 rounded-lg bg-white text-black font-semibold disabled:opacity-60";
+    "px-5 py-2 rounded-lg bg-white text-white font-semibold disabled:opacity-60";
 
 const btnGhost =
     "px-5 py-2 rounded-lg bg-white/5 border border-white/10 text-white font-semibold hover:bg-white/10 disabled:opacity-60";
@@ -24,6 +24,10 @@ export default function Profile() {
 
     const [name, setName] = useState("");
     const [saving, setSaving] = useState(false);
+
+    const nameChanged = (name || "").trim() !== (me?.name || "").trim();
+    const canSaveProfile = !saving && nameChanged && (name || "").trim().length > 0;
+
 
     const [cp, setCp] = useState("");
     const [np, setNp] = useState("");
@@ -54,6 +58,8 @@ export default function Profile() {
 
     async function saveProfile(e) {
         e.preventDefault();
+        if (!canSaveProfile) return;
+
         setOkMsg("");
         setErrMsg("");
         setSaving(true);
@@ -76,10 +82,17 @@ export default function Profile() {
         }
     }
 
+
     async function changePassword(e) {
         e.preventDefault();
         setOkMsg("");
         setErrMsg("");
+
+        if (np === cp) {
+            setErrMsg("New password cannot be the same as current password");
+            return;
+        }
+
         setChanging(true);
         try {
             await api("/api/me/change-password", {
@@ -161,21 +174,6 @@ export default function Profile() {
                             <div className="text-white/60 text-sm">Signed in as</div>
                             <div className="text-xl font-semibold mt-1">{me.email}</div>
 
-                            <div className="mt-3 flex flex-wrap gap-2 text-xs text-white/50">
-                <span className="px-2 py-1 rounded-full bg-white/5 border border-white/10">
-                  User ID: {me.id}
-                </span>
-
-                                {me?.is_admin ? (
-                                    <span className="px-2 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-200">
-                    Admin
-                  </span>
-                                ) : (
-                                    <span className="px-2 py-1 rounded-full bg-white/5 border border-white/10">
-                    User
-                  </span>
-                                )}
-                            </div>
                         </div>
 
                         {/* Edit profile */}
@@ -193,7 +191,7 @@ export default function Profile() {
                                 />
                             </div>
 
-                            <button disabled={saving} className={btn}>
+                            <button disabled={!canSaveProfile} className={btn}>
                                 {saving ? "Saving..." : "Save"}
                             </button>
                         </form>
@@ -228,25 +226,6 @@ export default function Profile() {
                                 {changing ? "Updating..." : "Update password"}
                             </button>
                         </form>
-
-                        {/* Future: quick actions */}
-                        <div className={`${card} flex items-center justify-between`}>
-                            <div>
-                                <div className="font-semibold">Quick actions</div>
-                                <div className="text-white/50 text-sm mt-1">
-                                    Next steps: Notifications & Wishlist pages
-                                </div>
-                            </div>
-
-                            <div className="flex gap-2">
-                                <button className={btnGhost} type="button">
-                                    Notifications
-                                </button>
-                                <button className={btnGhost} type="button">
-                                    Wishlist
-                                </button>
-                            </div>
-                        </div>
                     </>
                 )}
             </div>

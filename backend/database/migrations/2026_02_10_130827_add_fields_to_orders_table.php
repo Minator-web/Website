@@ -11,9 +11,6 @@ return new class extends Migration {
             $table->unsignedBigInteger('subtotal')->default(0)->after('user_id');
             $table->unsignedBigInteger('shipping_fee')->default(0)->after('subtotal');
 
-            // اگر total_price قبلاً هست، همینو نگه دار
-            // و فقط ترتیب مهم نیست
-
             $table->string('customer_name')->nullable()->after('status');
             $table->string('customer_email')->nullable()->after('customer_name');
             $table->string('customer_phone')->nullable()->after('customer_email');

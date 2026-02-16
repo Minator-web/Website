@@ -9,22 +9,20 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
-// database/migrations/xxxx_add_is_admin_to_users_table.php
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->boolean('is_admin')->default(false)->after('password');
+            $table->string('role')->default('user')->after('password');
+            $table->index('role');
         });
     }
 
-
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            //
+            $table->dropIndex(['role']);
+            $table->dropColumn('role');
         });
     }
+
 };

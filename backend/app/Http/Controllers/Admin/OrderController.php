@@ -11,8 +11,6 @@ use Illuminate\Validation\Rule;
 
 class OrderController extends Controller
 {
-
-
     public function setTracking(Request $request, Order $order)
     {
         $data = $request->validate([
@@ -30,9 +28,7 @@ class OrderController extends Controller
 
     public function index(Request $request)
     {
-        $q = Order::query();
-
-        $q->with(['user']);
+        $q = Order::query()->with(['user']);
 
         if ($request->filled('status') && $request->status !== 'all') {
             $q->where('status', $request->status);
@@ -50,7 +46,6 @@ class OrderController extends Controller
                     $uq->where('name', 'like', "%{$search}%")
                         ->orWhere('email', 'like', "%{$search}%");
                 });
-
             });
         }
 
@@ -62,10 +57,7 @@ class OrderController extends Controller
 
     public function show(Order $order)
     {
-        return $order->load([
-            'user',
-            'items.product'
-        ]);
+        return $order->load(['user','items.product']);
     }
 
     public function update(Request $request, Order $order)
@@ -87,15 +79,23 @@ class OrderController extends Controller
         }
 
         if ($to === Order::STATUS_CANCELLED && $from !== Order::STATUS_CANCELLED) {
-            $order->load('items');
-
             DB::transaction(function () use ($order) {
+                $order->load('items');
+
                 foreach ($order->items as $item) {
                     Product::where('id', $item->product_id)
                         ->lockForUpdate()
-                        ->increment('stock', (int) $item->qty);
+                        ->increment('stock', (int) $item->qty); // ✅ qty صحیح
                 }
+
+                $order->status = Order::STATUS_CANCELLED;
+                $order->save();
             });
+
+            return response()->json([
+                'message' => 'Status updated',
+                'order' => $order->fresh()->load(['user','items.product']),
+            ]);
         }
 
         $order->status = $to;
@@ -103,20 +103,46 @@ class OrderController extends Controller
 
         return response()->json([
             'message' => 'Status updated',
-            'order' => $order->fresh()->load('user'),
+            'order' => $order->fresh()->load(['user','items.product']),
         ]);
     }
 
-
-
     public function destroy(Order $order)
     {
+        $from = (string) $order->status;
+        $to = Order::STATUS_CANCELLED;
 
-        $order->update(['status' => 'cancelled']);
+        if ($from === Order::STATUS_CANCELLED) {
+            return response()->json([
+                'message' => 'Order already cancelled',
+                'order' => $order->fresh()->load(['user','items.product']),
+            ], 200);
+        }
+
+        if (!Order::canTransition($from, $to)) {
+            return response()->json([
+                'message' => "Order cannot be cancelled in current status",
+                'status' => $from,
+                'allowed_next' => Order::transitionFlow()[strtolower($from)] ?? [],
+            ], 422);
+        }
+
+        DB::transaction(function () use ($order) {
+            $order->load('items');
+
+            foreach ($order->items as $item) {
+                Product::where('id', $item->product_id)
+                    ->lockForUpdate()
+                    ->increment('stock', (int) $item->qty);
+            }
+
+            $order->status = Order::STATUS_CANCELLED;
+            $order->save();
+        });
 
         return response()->json([
-            'message' => 'Order cancelled',
-            'order' => $order->fresh()->load('user'),
+            'message' => 'Order cancelled successfully',
+            'order' => $order->fresh()->load(['user','items.product']),
         ]);
     }
 

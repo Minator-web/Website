@@ -11,9 +11,10 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
-    ->withMiddleware(function ($middleware) {
+    ->withMiddleware(function (Middleware $middleware) {
         $middleware->alias([
-            'is_admin' => \App\Http\Middleware\IsAdmin::class,
+            'is_super_admin' => \App\Http\Middleware\IsSuperAdmin::class,
+            'is_admin'       => \App\Http\Middleware\IsAdmin::class,
         ]);
     })
 
@@ -54,7 +55,7 @@ return Application::configure(basePath: dirname(__DIR__))
                     ], $status);
                 }
 
-                // 500+ سایر خطاها
+                // 500+ا
                 \Log::error('API Exception', [
                     'url' => $request->fullUrl(),
                     'method' => $request->method(),
@@ -72,7 +73,6 @@ return Application::configure(basePath: dirname(__DIR__))
                 ], 500);
             }
 
-            // اگر API نبود، رندر پیش‌فرض ادامه پیدا کند
             return null;
         });
 

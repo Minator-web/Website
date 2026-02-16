@@ -4,8 +4,26 @@ import { getCart, setCart, clearCart } from "../lib/cart";
 const CartCtx = createContext(null);
 
 export function CartProvider({ children }) {
-    const [items, setItems] = useState(() => getCart() || []);
-    // item shape: { product_id, title, price, qty }
+    const [items, setItems] = useState(() => {
+        const raw = getCart() || [];
+
+        return raw
+            .map((it) => {
+                const pid = Number(it.product_id ?? it.id);
+                const qty = Math.max(1, Number(it.qty ?? 1));
+                const price = Number(it.price ?? 0);
+
+                if (!Number.isFinite(pid) || pid <= 0) return null;
+
+                return {
+                    product_id: pid,
+                    title: it.title ?? "",
+                    price,
+                    qty,
+                };
+            })
+            .filter(Boolean);
+    });
 
     useEffect(() => {
         setCart(items);
@@ -19,7 +37,6 @@ export function CartProvider({ children }) {
                     x.product_id === item.product_id
                         ? {
                             ...x,
-                            // اگر قیمت/عنوان تغییر کرده، همگام کنیم
                             title: item.title ?? x.title,
                             price: item.price ?? x.price,
                             qty: Number(x.qty || 0) + 1,

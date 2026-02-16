@@ -9,11 +9,10 @@ const input =
 const label = "block text-sm mb-1 text-white/80";
 
 function calcShipping(city, subtotal) {
-    // این فقط برای نمایش UI هست؛ مبلغ واقعی همیشه از سرور معتبره
     const c = String(city || "").trim().toLowerCase();
     if (!subtotal) return 0;
     if (subtotal >= 1_000_000) return 0;
-    if (c === "تهران" || c === "tehran") return 30_000;
+    if (c === "Tehran" || c === "tehran") return 30_000;
     return 60_000;
 }
 
@@ -29,7 +28,6 @@ export default function Checkout() {
     const [address, setAddress] = useState("");
     const [loading, setLoading] = useState(false);
 
-    // ✅ idempotency key: تا زمانی که صفحه/فرم رفرش نشده ثابت می‌مونه
     const [clientRequestId, setClientRequestId] = useState(() => {
         if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
         return `req_${Date.now()}_${Math.random().toString(16).slice(2)}`;
@@ -65,7 +63,7 @@ export default function Checkout() {
 
     async function submit(e) {
         e.preventDefault();
-        if (loading) return; // ✅ جلوگیری از دوبار submit
+        if (loading) return;
         setLoading(true);
 
         try {
@@ -100,7 +98,6 @@ export default function Checkout() {
 
             clear();
 
-            // ✅ برای سفارش بعدی، کلید جدید بساز (فقط بعد از موفقیت)
             setClientRequestId(() => {
                 if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
                 return `req_${Date.now()}_${Math.random().toString(16).slice(2)}`;
@@ -169,7 +166,7 @@ export default function Checkout() {
                             onChange={(e) => setCity(e.target.value)}
                             required
                             disabled={loading}
-                            placeholder="مثلاً تهران"
+                            placeholder="Tehran"
                         />
                     </div>
 
@@ -196,7 +193,6 @@ export default function Checkout() {
                         Shipping fee and totals will be finalized by the server.
                     </div>
 
-                    {/* فقط برای دیباگ/اطمینان؛ اگر دوست نداری حذفش کن */}
                     <div className="text-[10px] text-white/30 break-all">
                         request_id: {clientRequestId}
                     </div>
@@ -236,9 +232,6 @@ export default function Checkout() {
                             </div>
                         </div>
 
-                        <div className="text-xs text-white/50">
-                            Final totals come from the server after placing the order.
-                        </div>
                     </div>
                 </div>
             </div>

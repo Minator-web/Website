@@ -64,7 +64,7 @@ export default function MyOrders() {
     async function load() {
         setLoading(true);
         try {
-            const res = await api("/api/orders/me"); // paginate
+            const res = await api("/api/orders/me");
             const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
             setOrders(list);
         } catch (e) {

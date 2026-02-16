@@ -1,35 +1,39 @@
 import { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { api } from "../lib/api";
 import NotFound from "../pages/NotFound";
 
 export default function AdminRoute({ children }) {
-    const [ok, setOk] = useState(null); // null=loading, true/false=done
+    const [ok, setOk] = useState(null);
+    const location = useLocation();
     const token = localStorage.getItem("token");
+    const role = localStorage.getItem("role");
 
     useEffect(() => {
-        let mounted = true;
-
-        async function check() {
-            if (!token) {
-                mounted && setOk(false);
-                return;
-            }
-            try {
-                const me = await api("/api/me");
-                mounted && setOk(!!me?.is_admin);
-            } catch (e) {
-                mounted && setOk(false);
-            }
+        if (!token) {
+            setOk(false);
+            return;
         }
 
-        check();
-        return () => (mounted = false);
-    }, [token]);
+        if (role === "admin" || role === "super_admin") {
+            setOk(true);
+            return;
+        }
 
-    if (ok === null) return <div className="min-h-screen bg-black text-white p-6">Loading...</div>;
+        setOk(false);
+    }, [token, role, location.pathname]);
 
-    if (!ok) return <NotFound />;
+    if (ok === null) {
+        return (
+            <div className="min-h-screen bg-black text-white p-6">
+                Loading...
+            </div>
+        );
+    }
+
+    if (!ok) {
+        return <NotFound />;
+    }
 
     return children;
 }

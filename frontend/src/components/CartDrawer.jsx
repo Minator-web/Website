@@ -60,13 +60,11 @@ export default function CartDrawer() {
         }
     }, [ids, toast]);
 
-    // فقط وقتی Drawer بازه، استوک رو چک کن (بهینه‌تر)
     useEffect(() => {
         if (!cartOpen) return;
         loadStock();
     }, [cartOpen, idsKey, loadStock]);
 
-    // ESC برای بستن
     useEffect(() => {
         if (!cartOpen) return;
         function onKeyDown(e) {

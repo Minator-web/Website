@@ -53,7 +53,7 @@ class ProductController extends Controller
         ]);
 
         if ($request->hasFile('image')) {
-            // حذف عکس قبلی
+
             if ($product->image_path) {
                 Storage::disk('public')->delete($product->image_path);
             }
@@ -64,8 +64,12 @@ class ProductController extends Controller
         return $product;
     }
 
-    public function destroy(Product $product)
+    public function destroy(Request $request,Product $product)
     {
+        if ($product->image_path) {
+            Storage::disk('public')->delete($product->image_path);
+        }
+
         $product->delete();
         return response()->json(['message' => 'Deleted']);
     }

@@ -13,7 +13,7 @@ export function ToastProvider({ children }) {
         const id = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
         const item = {
             id,
-            type: toast.type || "info", // info | success | error
+            type: toast.type || "info",
             title: toast.title || "",
             message: toast.message || "",
             duration: Number.isFinite(toast.duration) ? toast.duration : 3000,
@@ -21,7 +21,6 @@ export function ToastProvider({ children }) {
 
         setToasts((prev) => [item, ...prev]);
 
-        // auto close
         window.setTimeout(() => remove(id), item.duration);
 
         return id;

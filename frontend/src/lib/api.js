@@ -1,4 +1,4 @@
-const BASE_URL = "http://127.0.0.1:8000";
+const BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
 function firstValidationError(errors) {
     if (!errors || typeof errors !== "object") return "";
@@ -42,18 +42,15 @@ export async function api(path, options = {}) {
             data = { message: "Invalid JSON response" };
         }
     } else {
-        // HTML/Plain text -> پیام کوتاه
         const short = (text || "").slice(0, 300);
         data = { message: short || `Request failed (${res.status})` };
     }
 
-    // 401: پاک کردن توکن + پیام واضح
     if (res.status === 401) {
         localStorage.removeItem("token");
         throw { message: data?.message || "Please login again", status: 401 };
     }
 
-    // 422: Validation -> پیام بهتر
     if (res.status === 422) {
         const msg = firstValidationError(data.errors) || data.message || "Invalid data";
         throw { ...data, message: msg, status: 422 };
@@ -63,10 +60,23 @@ export async function api(path, options = {}) {
         throw { ...data, status: 429, message: data?.message || "Too many requests. Please try again later." };
     }
 
-
     if (!res.ok) {
         throw { ...data, status: res.status, message: data?.message || "Request failed" };
     }
 
     return data;
+}
+
+export async function fetchStockMap(productIds) {
+    const ids = (productIds || [])
+        .map((x) => Number(x))
+        .filter((x) => Number.isInteger(x) && x > 0);
+
+    if (ids.length === 0) return {};
+    const res = await fetch(`${BASE_URL}/api/products/stock`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ product_ids: ids }),
+    });
+    return res;
 }

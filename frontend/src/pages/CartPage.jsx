@@ -17,7 +17,7 @@ export default function CartPage() {
     const toast = useToast();
     const navigate = useNavigate();
 
-    const [stockMap, setStockMap] = useState({}); // { [product_id]: { stock, is_active } }
+    const [stockMap, setStockMap] = useState({});
     const [stockLoading, setStockLoading] = useState(false);
     const [stockFailed, setStockFailed] = useState(false);
 
@@ -73,7 +73,6 @@ export default function CartPage() {
         };
     }, [idsKey, loadStock]);
 
-    // مشکل موجودی: qty بیشتر از stock یا محصول غیرفعال
     const hasStockProblem = useMemo(() => {
         return items.some((it) => {
             const meta = stockMap[it.product_id];
@@ -83,7 +82,6 @@ export default function CartPage() {
         });
     }, [items, stockMap]);
 
-    // اجازه رفتن به checkout؟
     const canCheckout = useMemo(() => {
         if (items.length === 0) return false;
         if (stockLoading) return false;
@@ -93,7 +91,7 @@ export default function CartPage() {
 
     function canInc(it) {
         const meta = stockMap[it.product_id];
-        if (!meta) return false; // تا موجودی نیومده
+        if (!meta) return false;
         if (!meta.is_active) return false;
         return Number(it.qty) < Number(meta.stock);
     }
@@ -107,9 +105,9 @@ export default function CartPage() {
     function qtyHint(it) {
         const meta = stockMap[it.product_id];
         if (!meta) return null;
-        if (!meta.is_active) return "این محصول غیرفعال شده";
-        if (meta.stock <= 0) return "ناموجود";
-        if (it.qty > meta.stock) return `فقط ${meta.stock} عدد موجوده`;
+        if (!meta.is_active) return "This product is not active";
+        if (meta.stock <= 0) return "Out of stock";
+        if (it.qty > meta.stock) return `just${meta.stock} remaining`;
         return `موجودی: ${meta.stock}`;
     }
 

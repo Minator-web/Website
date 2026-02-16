@@ -12,8 +12,8 @@ return new class extends Migration {
             $table->foreignId('order_id')->constrained()->cascadeOnDelete();
             $table->foreignId('product_id')->nullable()->constrained()->nullOnDelete();
 
-            $table->string('product_title'); // snapshot
-            $table->unsignedBigInteger('unit_price'); // snapshot (toman/rial as integer)
+            $table->string('product_title');
+            $table->unsignedBigInteger('unit_price');
             $table->unsignedInteger('qty');
             $table->unsignedBigInteger('subtotal');
 

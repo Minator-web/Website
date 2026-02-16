@@ -39,20 +39,15 @@ export default function ProductDetails() {
     const { id } = useParams();
     const { add } = useCart();
     const toast = useToast();
-    const { isLiked, toggle } = useWishlist();
 
+    const { openCart } = useDrawer();
 
-    const token = localStorage.getItem("token");
-
-    const { openCart, toggleCart } = useDrawer();
-    const showCart = openCart || toggleCart;
+    const { isLiked, toggle, loading: wishlistHydrating } = useWishlist();
+    const [likeLoading, setLikeLoading] = useState(false);
 
     const [p, setP] = useState(null);
     const [loading, setLoading] = useState(true);
     const [loadFailed, setLoadFailed] = useState(false);
-
-    const [liked, setLiked] = useState(false);
-    const [likeLoading, setLikeLoading] = useState(false);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -77,35 +72,26 @@ export default function ProductDetails() {
         load();
     }, [load]);
 
-    // ✅ init like
-    useEffect(() => {
-        async function initLike() {
-            if (!token || !p?.id) return;
-            try {
-                const ids = await api("/api/wishlist/ids");
-                const s = new Set((ids || []).map(Number));
-                setLiked(s.has(Number(p.id)));
-            } catch {
-                // ignore
-            }
-        }
-        initLike();
-    }, [token, p?.id]);
-
     const isActive = !!p?.is_active;
     const stock = Number(p?.stock ?? 0);
+
+    const liked = !!(p?.id && isLiked(p.id));
 
     async function toggleLike() {
         if (!p?.id) return;
 
+        setLikeLoading(true);
         try {
             const likedNow = await toggle(p.id);
+
             toast.push({
                 type: likedNow ? "success" : "info",
                 message: likedNow ? "Added to WishList" : "Deleted From WishList",
             });
         } catch (e) {
             toast.push({ type: "error", message: e?.message || "Error in Wishlist" });
+        } finally {
+            setLikeLoading(false);
         }
     }
 
@@ -129,9 +115,7 @@ export default function ProductDetails() {
             title: "Added to cart",
             message: "Product added to your cart.",
         });
-
-        // ✅ باز کردن دراور کارت (هرکدوم موجود بود)
-        if (showCart) showCart();
+        openCart();
     }
 
     return (
@@ -196,16 +180,12 @@ export default function ProductDetails() {
                             </div>
 
                             {p.description ? (
-                                <div className="text-white/80 leading-relaxed whitespace-pre-line">
-                                    {p.description}
-                                </div>
+                                <div className="text-white/80 leading-relaxed whitespace-pre-line">{p.description}</div>
                             ) : (
                                 <div className="text-white/50">No description.</div>
                             )}
 
-                            <div className="text-3xl font-extrabold">
-                                {Number(p.price).toLocaleString()}
-                            </div>
+                            <div className="text-3xl font-extrabold">{Number(p.price).toLocaleString()}</div>
 
                             <div className="flex gap-2">
                                 <button
@@ -219,7 +199,7 @@ export default function ProductDetails() {
 
                                 <button
                                     onClick={toggleLike}
-                                    disabled={likeLoading}
+                                    disabled={likeLoading || wishlistHydrating}
                                     className="px-4 py-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-60"
                                     title="Wishlist"
                                     type="button"

@@ -2,12 +2,12 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Order extends Model
 {
-
-    // وضعیت‌های مجاز سفارش (یکپارچه با فرانت/ادمین)
+    use HasFactory;
     public const STATUS_PENDING   = 'pending';
     public const STATUS_CONFIRMED = 'confirmed';
     public const STATUS_SHIPPED   = 'shipped';
@@ -25,10 +25,7 @@ class Order extends Model
         ];
     }
 
-    /**
-     * جریان مجاز تغییر وضعیت.
-     * فعلاً بدون پرداخت.
-     */
+
     public static function transitionFlow(): array
     {
         return [

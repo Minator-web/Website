@@ -3,7 +3,7 @@ import { api } from "../../lib/api";
 
 function money(n) {
     const x = Number(n ?? 0);
-    return x.toLocaleString("fa-IR");
+    return x.toLocaleString();
 }
 
 function Badge({ children }) {

@@ -12,7 +12,6 @@ return new class extends Migration
     public function up()
     {
         Schema::table('orders', function (Blueprint $table) {
-            // اگر foreignId هست:
             $table->unsignedBigInteger('user_id')->nullable(false)->change();
         });
     }

@@ -13,7 +13,7 @@ class CheckoutController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'client_request_id' => ['nullable', 'string', 'max:80'], // ✅ idempotency
+            'client_request_id' => ['nullable', 'string', 'max:80'],
 
             'customer_name' => ['required','string','max:255'],
             'customer_email' => ['required','email','max:255'],
@@ -40,6 +40,23 @@ class CheckoutController extends Controller
             ->all();
 
         return DB::transaction(function () use ($data, $user, $mergedItems) {
+
+            $city = trim($data['city']);
+            $clientRequestId = $data['client_request_id'] ?? null;
+
+            // ✅ Idempotency check (inside transaction) + lock (race-safe)
+            if (!empty($clientRequestId)) {
+                $existing = Order::where('client_request_id', $clientRequestId)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($existing) {
+                    return response()->json([
+                        'message' => 'Order already created',
+                        'order' => $existing->load(['items.product','user']),
+                    ], 200);
+                }
+            }
 
             $productIds = collect($mergedItems)->pluck('product_id')->values();
             $products = Product::whereIn('id', $productIds)
@@ -84,45 +101,21 @@ class CheckoutController extends Controller
                 ];
             }
 
-            $city = trim($data['city']);
-
-            $shippingFee = 60000;
-            if (mb_strtolower($city) === 'Tehran' || mb_strtolower($city) === 'tehran') {
-                $shippingFee = 30000;
-            }
-            if ($subtotal >= 1000000) {
-                $shippingFee = 0;
-            }
-
-            $total = $subtotal + $shippingFee;
-
-            $clientRequestId = $data['client_request_id'] ?? null;
-
-            if (!empty($clientRequestId)) {
-                $existing = Order::where('client_request_id', $clientRequestId)->first();
-                if ($existing) {
-                    return response()->json([
-                        'message' => 'Order already created',
-                        'order' => $existing->load(['items.product','user']),
-                    ], 200);
-                }
-            }
-
             $shipping = app(ShippingService::class)->calculate($city, $subtotal);
-            $shippingFee = (int) $shipping['shipping_fee'];
-            $shippingMethod = $shipping['shipping_method'];
+            $shippingFee = (int) ($shipping['shipping_fee'] ?? 0);
+            $shippingMethod = (string) ($shipping['shipping_method'] ?? 'standard');
 
             $total = $subtotal + $shippingFee;
 
             $order = Order::create([
                 'user_id' => $user->id,
                 'client_request_id' => $clientRequestId,
+
                 'subtotal' => $subtotal,
                 'shipping_fee' => $shippingFee,
                 'total_price' => $total,
                 'status' => Order::STATUS_PENDING,
                 'shipping_method' => $shippingMethod,
-
 
                 'customer_name' => $data['customer_name'],
                 'customer_email' => $data['customer_email'],
@@ -133,7 +126,6 @@ class CheckoutController extends Controller
 
             $order->order_code = 'ORD-' . now()->format('Y') . '-' . str_pad((string)$order->id, 6, '0', STR_PAD_LEFT);
             $order->save();
-
 
             foreach ($itemsPayload as $row) {
                 $order->items()->create($row);
@@ -146,7 +138,7 @@ class CheckoutController extends Controller
 
             return response()->json([
                 'message' => 'Order created',
-                'order' => $order->load(['items','user']),
+                'order' => $order->load(['items.product','user']),
             ], 201);
         });
     }

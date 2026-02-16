@@ -7,7 +7,6 @@ use Illuminate\Http\Request;
 
 class WishlistController extends Controller
 {
-    // ✅ فقط ids برای shop (سریع)
     public function ids(Request $request)
     {
         $user = $request->user();
@@ -15,7 +14,6 @@ class WishlistController extends Controller
         return $ids->map(fn ($x) => (int) $x)->values();
     }
 
-    // ✅ لیست کامل محصولات wishlist (برای صفحه جدا)
     public function index(Request $request)
     {
         $user = $request->user();
@@ -28,7 +26,6 @@ class WishlistController extends Controller
         return response()->json(['data' => $items]);
     }
 
-    // ✅ toggle like/unlike
     public function toggle(Request $request, Product $product)
     {
         $user = $request->user();
@@ -44,7 +41,6 @@ class WishlistController extends Controller
         return response()->json(['liked' => true]);
     }
 
-    // ✅ remove مستقیم (اختیاری)
     public function destroy(Request $request, Product $product)
     {
         $request->user()->wishlistProducts()->detach($product->id);

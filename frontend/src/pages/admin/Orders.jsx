@@ -16,7 +16,6 @@ const btnDark =
 const btnGhost =
     "px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white hover:bg-white/10 transition disabled:opacity-60";
 
-// ✅ فاز ۱ بدون پرداخت
 const STATUS = ["pending", "confirmed", "shipped", "delivered", "cancelled"];
 
 const STATUS_META = {
@@ -65,18 +64,15 @@ export default function Orders() {
     const [q, setQ] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
 
-    // View modal
     const [viewOpen, setViewOpen] = useState(false);
     const [viewOrder, setViewOrder] = useState(null);
     const [viewLoading, setViewLoading] = useState(false);
     const [viewErr, setViewErr] = useState("");
 
-    // Tracking edit (Option B)
     const [trackingInput, setTrackingInput] = useState("");
     const [trackingSaving, setTrackingSaving] = useState(false);
     const [trackingErr, setTrackingErr] = useState("");
 
-    // Update status modal
     const [statusOpen, setStatusOpen] = useState(false);
     const [statusOrder, setStatusOrder] = useState(null);
     const [newStatus, setNewStatus] = useState("pending");
@@ -109,7 +105,6 @@ export default function Orders() {
             load({ status: statusFilter, search: q });
         }, 300);
         return () => clearTimeout(t);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [statusFilter, q]);
 
     const list = useMemo(() => items || [], [items]);
@@ -120,13 +115,12 @@ export default function Orders() {
         setViewLoading(true);
         setViewOpen(true);
         setViewOrder(null);
-        setTrackingInput(""); // ✅ قبل از لود خالی کن
+        setTrackingInput("");
 
         try {
             const data = await api(`/api/admin/orders/${orderId}`);
             setViewOrder(data);
 
-            // ✅ اینجا data وجود داره
             setTrackingInput(data?.tracking_code ?? "");
         } catch (e) {
             setViewErr(e?.message || "Failed to load order");
@@ -169,10 +163,8 @@ export default function Orders() {
 
             const updated = res?.order ?? res;
 
-            // ✅ مودال رو با دیتای جدید آپدیت کن
             setViewOrder(updated);
 
-            // ✅ لیست جدول هم آپدیت شه
             setItems((prev) =>
                 prev.map((x) => (x.id === updated.id ? { ...x, tracking_code: updated.tracking_code } : x))
             );
@@ -255,7 +247,7 @@ export default function Orders() {
                             className={inputCls}
                             value={q}
                             onChange={(e) => setQ(e.target.value)}
-                            placeholder="مثلا 12 یا amir@gmail.com"
+                            placeholder="Email OR ID OR Name..."
                         />
                     </div>
 
@@ -435,7 +427,6 @@ export default function Orders() {
                                     </div>
                                 </div>
 
-                                {/* ✅ Tracking (Option B: editable) */}
                                 <div className="mt-4 bg-white/5 border border-white/10 rounded-xl p-4">
                                     <div className="text-white/60 text-xs">Tracking code</div>
 

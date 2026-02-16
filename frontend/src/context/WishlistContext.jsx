@@ -3,11 +3,27 @@ import { api } from "../lib/api";
 
 const WishlistCtx = createContext(null);
 
+function getToken() {
+    return localStorage.getItem("token");
+}
+
 export function WishlistProvider({ children }) {
     const [likedIds, setLikedIds] = useState(() => new Set());
     const [loading, setLoading] = useState(false);
 
-    const token = localStorage.getItem("token");
+    const [token, setToken] = useState(() => getToken());
+
+    useEffect(() => {
+        function sync() {
+            setToken(getToken());
+        }
+        window.addEventListener("auth:changed", sync);
+        window.addEventListener("storage", sync);
+        return () => {
+            window.removeEventListener("auth:changed", sync);
+            window.removeEventListener("storage", sync);
+        };
+    }, []);
 
     const hydrate = useCallback(async () => {
         if (!token) {
@@ -20,31 +36,24 @@ export function WishlistProvider({ children }) {
             const ids = await api("/api/wishlist/ids");
             setLikedIds(new Set((ids || []).map(Number)));
         } catch {
-            // اگر خطا خورد، فعلاً خالی می‌ذاریم (UI خراب نشه)
             setLikedIds(new Set());
         } finally {
             setLoading(false);
         }
     }, [token]);
 
-    // وقتی توکن عوض شد (login/logout) sync کن
     useEffect(() => {
         hydrate();
     }, [hydrate]);
 
-    const isLiked = useCallback(
-        (productId) => likedIds.has(Number(productId)),
-        [likedIds]
-    );
+    const isLiked = useCallback((productId) => likedIds.has(Number(productId)), [likedIds]);
 
-    // toggle با optimistic UI
     const toggle = useCallback(
         async (productId) => {
-            if (!token) throw new Error("اول لاگین کن");
+            if (!token) throw new Error("Login Please!");
 
             const id = Number(productId);
 
-            // optimistic update
             setLikedIds((prev) => {
                 const n = new Set(prev);
                 if (n.has(id)) n.delete(id);
@@ -55,7 +64,6 @@ export function WishlistProvider({ children }) {
             try {
                 const res = await api(`/api/wishlist/${id}/toggle`, { method: "POST" });
 
-                // سرور منبع حقیقته: اگر نتیجه خلاف optimistic بود اصلاح می‌کنیم
                 setLikedIds((prev) => {
                     const n = new Set(prev);
                     if (res?.liked) n.add(id);
@@ -65,7 +73,6 @@ export function WishlistProvider({ children }) {
 
                 return !!res?.liked;
             } catch (e) {
-                // rollback
                 setLikedIds((prev) => {
                     const n = new Set(prev);
                     if (n.has(id)) n.delete(id);

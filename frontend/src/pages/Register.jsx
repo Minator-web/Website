@@ -19,20 +19,17 @@ export default function Register() {
         setLoading(true);
 
         try {
-            // 1) ثبت نام
             const reg = await api("/api/register", {
                 method: "POST",
                 body: JSON.stringify({ name, email, password }),
             });
 
-            // 2) اگر بک‌اند توکن داد، ذخیره کن
             let token =
                 reg.token ||
                 reg.access_token ||
                 reg?.token?.plainTextToken ||
                 reg?.data?.token;
 
-            // 3) اگر توکن نداد، اتومات لاگین کن (مثل Login.jsx)
             if (!token) {
                 const login = await api("/api/login", {
                     method: "POST",
@@ -53,10 +50,8 @@ export default function Register() {
 
             localStorage.setItem("token", token);
 
-            // بعد ثبت نام: ببر به shop یا سفارش‌ها
             navigate("/", { replace: true });
         } catch (err) {
-            // پیام‌های validation لاراول
             const msg =
                 err?.message ||
                 (err?.errors ? Object.values(err.errors)?.[0]?.[0] : null) ||
@@ -153,7 +148,7 @@ export default function Register() {
                             </div>
 
                             <p className="mt-2 text-xs text-white/50">
-                                Use at least 6 characters.
+                                Use at least 8 characters.
                             </p>
                         </div>
                     </div>

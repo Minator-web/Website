@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->unsignedBigInteger('total_price')->default(0);
-            $table->string('status')->default('pending'); // pending, paid, shipped, delivered, cancelled
+            $table->string('status')->default('pending');
             $table->string('city')->nullable();
             $table->timestamps();
         });

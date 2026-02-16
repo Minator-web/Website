@@ -35,9 +35,18 @@ export default function Login() {
             localStorage.setItem("token", token);
 
             const me = await api("/api/me");
-            if (me?.is_admin) navigate("/admin");
+            const role = (me?.role || (me?.is_admin ? "admin" : "user")).toLowerCase();
+            localStorage.setItem("role", role);
+
+            window.dispatchEvent(new Event("auth:changed"));
+
+            if (role === "admin") navigate("/admin");
             else navigate("/");
         } catch (err) {
+            localStorage.removeItem("token");
+            localStorage.removeItem("role");
+            window.dispatchEvent(new Event("auth:changed"));
+
             setError(err?.message || "Network error / API not reachable");
         } finally {
             setLoading(false);
@@ -56,22 +65,17 @@ export default function Login() {
                     onSubmit={handleSubmit}
                     className="relative overflow-hidden rounded-3xl border border-white/10 bg-zinc-900/70 shadow-xl backdrop-blur p-7 space-y-5"
                 >
-                    {/* subtle glow */}
-                    <div
-                        className="pointer-events-none absolute -top-24 -right-24 h-48 w-48 rounded-full bg-white/5 blur-2xl"/>
+                    <div className="pointer-events-none absolute -top-24 -right-24 h-48 w-48 rounded-full bg-white/5 blur-2xl" />
 
                     <div className="space-y-1">
                         <h1 className="text-2xl font-extrabold tracking-tight text-white">
                             Welcome back
                         </h1>
-                        <p className="text-sm text-white/60">
-                            Sign in to continue
-                        </p>
+                        <p className="text-sm text-white/60">Sign in to continue</p>
                     </div>
 
                     {error && (
-                        <div
-                            className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
                             {error}
                         </div>
                     )}
@@ -119,7 +123,7 @@ export default function Login() {
 
                             <div className="mt-2 flex items-center justify-between">
                                 <label className="flex items-center gap-2 text-xs text-white/60">
-                                    <input type="checkbox" className="h-4 w-4"/>
+                                    <input type="checkbox" className="h-4 w-4" />
                                     Remember me
                                 </label>
 
@@ -140,9 +144,12 @@ export default function Login() {
                     >
                         {loading ? "Logging in..." : "Login"}
                     </button>
+
                     <p className="text-center text-xs text-white/60">
                         Don’t have an account?{" "}
-                        <a href="/register" className="text-white underline">Register</a>
+                        <a href="/register" className="text-white underline">
+                            Register
+                        </a>
                     </p>
 
                     <p className="text-center text-xs text-white/50">

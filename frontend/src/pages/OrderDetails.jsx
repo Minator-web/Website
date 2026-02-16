@@ -126,7 +126,7 @@ export default function OrderDetails() {
     async function cancelOrder() {
         if (!order?.id) return;
 
-        const ok = window.confirm("سفارش لغو شود؟");
+        const ok = window.confirm("Cancel order?");
         if (!ok) return;
 
         setCancelLoading(true);
@@ -153,7 +153,6 @@ export default function OrderDetails() {
 
     if (loading) return <OrderDetailsSkeleton />;
 
-    // اگر لود شکست خورد، یک UI تمیز با Retry
     if (loadFailed) {
         return (
             <div className="min-h-screen bg-black p-6 text-white">

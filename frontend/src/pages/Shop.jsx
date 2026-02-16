@@ -53,11 +53,10 @@ export default function Shop() {
     const [loading, setLoading] = useState(true);
     const [loadFailed, setLoadFailed] = useState(false);
 
-    // UI controls
     const [q, setQ] = useState("");
     const [onlyInStock, setOnlyInStock] = useState(false);
     const [onlyActive, setOnlyActive] = useState(true);
-    const [sortBy, setSortBy] = useState("newest"); // newest | price_asc | price_desc
+    const [sortBy, setSortBy] = useState("newest");
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -68,7 +67,6 @@ export default function Shop() {
             const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
             setProducts(list);
 
-            // ✅ wishlist ids فقط برای لاگین‌شده‌ها
             if (token) {
                 try {
                     const ids = await api("/api/wishlist/ids");
@@ -101,7 +99,7 @@ export default function Shop() {
         e.stopPropagation();
 
         if (!token) {
-            toast.push({ type: "info", message: "اول لاگین کن" });
+            toast.push({ type: "info", title: "Login Please" });
             return;
         }
 
@@ -124,7 +122,7 @@ export default function Shop() {
                 title: res?.liked ? "Added to Wishlist" : "Deleted from Wishlist",
             });
         } catch (err) {
-            toast.push({ type: "error", message: err?.message || "خطا در Wishlist" });
+            toast.push({ type: "error", message: err?.message || "Error in Wishlist" });
         } finally {
             setLikeLoadingId(null);
         }
@@ -314,7 +312,7 @@ export default function Shop() {
                                                                 message: likedNow ? "Added to Wishlist" : "Deleted from Wishlist",
                                                             });
                                                         })
-                                                        .catch((err) => toast.push({ type: "error", message: err?.message || "خطا در Wishlist" }));
+                                                        .catch((err) => toast.push({ type: "error", message: err?.message || "Error in Wishlist" }));
                                                 }}
                                                 className="absolute top-2 right-2 px-2 py-1 rounded-lg border border-white/10 bg-black/50 hover:bg-black/70 backdrop-blur disabled:opacity-60"
                                                 title="Wishlist"

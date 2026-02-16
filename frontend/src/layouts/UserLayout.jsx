@@ -12,31 +12,51 @@ export default function UserLayout({ children }) {
     const toast = useToast();
     const { count: wishlistCount } = useWishlist();
 
+
+
     const { items } = useCart();
     const { toggleCart } = useDrawer();
 
-    // ✅ بهتر از اینکه هر بار مستقیم localStorage بخونیم
     const [token, setToken] = useState(() => localStorage.getItem("token"));
+    const [role, setRole] = useState(() => localStorage.getItem("role") || "");
     const [me, setMe] = useState(null);
+    const roleLower = String(role || "").toLowerCase();
+    const canAccessAdmin = roleLower === "admin" || roleLower === "super_admin";
 
-    // ✅ تعداد واقعی (جمع qty)
     const cartCount = useMemo(
         () => items.reduce((sum, it) => sum + Number(it.qty ?? 1), 0),
         [items]
     );
 
     useEffect(() => {
-        // اگر token نیست، اطلاعات me رو پاک کن
+        function syncAuth() {
+            setToken(localStorage.getItem("token"));
+            setRole(localStorage.getItem("role") || "");
+        }
+
+        window.addEventListener("auth:changed", syncAuth);
+        return () => window.removeEventListener("auth:changed", syncAuth);
+    }, []);
+
+    useEffect(() => {
         if (!token) {
             setMe(null);
             return;
         }
 
         api("/api/me")
-            .then(setMe)
+            .then((u) => {
+                setMe(u);
+
+                const r = u?.role || (u?.is_admin ? "admin" : "user");
+                localStorage.setItem("role", r);
+                setRole(r);
+            })
             .catch(() => {
                 localStorage.removeItem("token");
+                localStorage.removeItem("role");
                 setToken(null);
+                setRole("");
                 setMe(null);
 
                 toast.push({
@@ -47,7 +67,6 @@ export default function UserLayout({ children }) {
 
                 navigate("/login");
             });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [token]);
 
     async function handleLogout() {
@@ -56,10 +75,18 @@ export default function UserLayout({ children }) {
         } catch (_) {}
 
         localStorage.removeItem("token");
+        localStorage.removeItem("role");
+        window.dispatchEvent(new Event("auth:changed"));
+
         setToken(null);
+        setRole("");
         setMe(null);
 
-        toast.push({ type: "success", title: "Logged out", message: "You have been logged out." });
+        toast.push({
+            type: "success",
+            title: "Logged out",
+            message: "You have been logged out.",
+        });
 
         navigate("/");
     }
@@ -89,7 +116,10 @@ export default function UserLayout({ children }) {
                                     )}
                                 </button>
 
-                                <Link to="/my-orders" className="px-3 py-1 rounded-lg bg-white/10 border border-white/10">
+                                <Link
+                                    to="/my-orders"
+                                    className="px-3 py-1 rounded-lg bg-white/10 border border-white/10"
+                                >
                                     My Orders
                                 </Link>
 
@@ -100,34 +130,49 @@ export default function UserLayout({ children }) {
                                     Wishlist
                                     {wishlistCount > 0 && (
                                         <span className="absolute -top-2 -right-2 text-xs bg-white text-black rounded-full px-2 py-0.5">
-      {wishlistCount}
-    </span>
+                      {wishlistCount}
+                    </span>
                                     )}
                                 </Link>
 
-                                <Link to="/profile" className="px-3 py-1 rounded-lg bg-white/10 border border-white/10">
+                                <Link
+                                    to="/profile"
+                                    className="px-3 py-1 rounded-lg bg-white/10 border border-white/10"
+                                >
                                     Profile
                                 </Link>
-
                             </>
                         )}
 
-                        {me?.is_admin && (
-                            <Link to="/admin" className="px-3 py-1 rounded-lg bg-emerald-500 text-black font-semibold">
+                        {token && canAccessAdmin && (
+                            <Link
+                                to="/admin"
+                                className="px-4 py-2 rounded-xl
+      bg-indigo-500/15
+      border border-indigo-500/30
+      text-indigo-300
+      hover:bg-indigo-500/25
+      transition"
+                            >
                                 Admin Panel
                             </Link>
                         )}
                     </div>
 
-                    {/* RIGHT */}
                     <div className="flex items-center gap-3">
                         {!token ? (
                             <>
-                                <Link to="/login" className="px-3 py-1 rounded-lg bg-white/10 border border-white/10">
+                                <Link
+                                    to="/login"
+                                    className="px-3 py-1 rounded-lg bg-white/10 border border-white/10"
+                                >
                                     Login
                                 </Link>
 
-                                <Link to="/register" className="px-3 py-1 rounded-lg bg-white text-black font-semibold">
+                                <Link
+                                    to="/register"
+                                    className="px-3 py-1 rounded-lg bg-white text-black font-semibold"
+                                >
                                     Register
                                 </Link>
                             </>
@@ -146,7 +191,6 @@ export default function UserLayout({ children }) {
 
             <div className="p-6">{children}</div>
 
-            {/* ✅ Drawer فقط یکبار اینجا */}
             <CartDrawer />
         </div>
     );
