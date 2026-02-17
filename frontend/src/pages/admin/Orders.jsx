@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../lib/api";
+import { formatUSD } from "../../lib/format";
+
 
 const inputCls =
     "w-full rounded-lg bg-zinc-950 border border-white/10 text-white placeholder:text-white/40 p-2 " +
@@ -8,7 +10,7 @@ const inputCls =
 const labelCls = "block text-sm mb-1 text-white/80";
 
 const btnPrimary =
-    "px-4 py-2 rounded-lg bg-white text-black font-medium hover:opacity-90 transition disabled:opacity-60";
+    "px-4 py-2 rounded-lg bg-white text-white font-medium hover:opacity-90 transition disabled:opacity-60";
 
 const btnDark =
     "px-3 py-2 rounded-lg bg-black text-white border border-white/10 hover:bg-white/5 transition";
@@ -48,11 +50,8 @@ function formatDate(iso) {
     return Number.isNaN(d.getTime()) ? String(iso) : d.toLocaleString();
 }
 
-function money(x) {
-    if (x === null || x === undefined) return "-";
-    const n = Number(x);
-    if (Number.isNaN(n)) return String(x);
-    return n.toLocaleString();
+function money(n) {
+    return formatUSD(n);
 }
 
 export default function Orders() {

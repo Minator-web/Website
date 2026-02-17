@@ -7,6 +7,11 @@ import Skeleton from "../components/Skeleton";
 import { useToast } from "../context/ToastContext";
 import { useDrawer } from "../context/DrawerContext";
 import { useWishlist } from "../context/WishlistContext";
+import { formatUSD } from "../lib/format";
+import StockBadge from "../components/StockBadge";
+
+
+
 
 function ProductDetailsSkeleton() {
     return (
@@ -173,10 +178,10 @@ export default function ProductDetails() {
                         <div className="space-y-4">
                             <div>
                                 <h2 className="text-2xl font-extrabold">{p.title}</h2>
-                                <div className="text-white/60 mt-1">
-                                    Stock: <span className="text-white">{stock}</span>
-                                    {!isActive ? <span className="ml-2 text-red-200">(inactive)</span> : null}
+                                <div className="mt-2">
+                                    <StockBadge stock={stock} isActive={isActive} />
                                 </div>
+
                             </div>
 
                             {p.description ? (
@@ -185,7 +190,9 @@ export default function ProductDetails() {
                                 <div className="text-white/50">No description.</div>
                             )}
 
-                            <div className="text-3xl font-extrabold">{Number(p.price).toLocaleString()}</div>
+                            <div className="text-3xl font-extrabold">
+                                {formatUSD(p.price)}
+                            </div>
 
                             <div className="flex gap-2">
                                 <button

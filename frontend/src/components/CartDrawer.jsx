@@ -5,12 +5,16 @@ import { useCart } from "../context/CartContext";
 import { api } from "../lib/api";
 import Skeleton from "./Skeleton";
 import { useToast } from "../context/ToastContext";
+import EmptyState from "./EmptyState";
 
-function money(x) {
-    const n = Number(x);
-    if (Number.isNaN(n)) return x ?? "-";
-    return n.toLocaleString();
+function money(value) {
+    return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+        minimumFractionDigits: 2,
+    }).format(Number(value ?? 0));
 }
+
 
 export default function CartDrawer() {
     const { cartOpen, closeCart } = useDrawer();
@@ -65,6 +69,20 @@ export default function CartDrawer() {
         loadStock();
     }, [cartOpen, idsKey, loadStock]);
 
+
+    useEffect(() => {
+        if (cartOpen) {
+            document.body.style.overflow = "hidden";
+        } else {
+            document.body.style.overflow = "";
+        }
+
+        return () => {
+            document.body.style.overflow = "";
+        };
+    }, [cartOpen]);
+
+
     useEffect(() => {
         if (!cartOpen) return;
         function onKeyDown(e) {
@@ -89,6 +107,15 @@ export default function CartDrawer() {
         if (stockFailed) return false;
         return !hasStockProblem;
     }, [items.length, stockLoading, stockFailed, hasStockProblem]);
+
+    const subtotal = useMemo(
+        () => items.reduce((sum, it) => sum + Number(it.price) * Number(it.qty), 0),
+        [items]
+    );
+
+    const shipping = useMemo(() => (items.length ? 0 : 0), [items.length]);
+    const tax = useMemo(() => 0, []);
+    const grandTotal = useMemo(() => subtotal + shipping + tax, [subtotal, shipping, tax]);
 
     function canInc(it) {
         const meta = stockMap[it.product_id];
@@ -174,18 +201,21 @@ export default function CartDrawer() {
                     {/* Body */}
                     <div className="flex-1 overflow-auto p-4 space-y-3">
                         {items.length === 0 ? (
-                            <div className="bg-white/5 border border-white/10 rounded-2xl p-6 text-white/70">
-                                Cart is empty.
-                                <div className="mt-4">
+                            <EmptyState
+                                icon="🛒"
+                                title="Your cart is empty"
+                                description="Add some products to continue."
+                                actions={
                                     <Link
                                         to="/"
                                         onClick={closeCart}
-                                        className="inline-block px-4 py-2 rounded-lg bg-white text-black font-semibold"
+                                        className="inline-block px-4 py-2 rounded-lg bg-black text-white font-semibold"
                                     >
                                         Go shopping
                                     </Link>
-                                </div>
-                            </div>
+                                }
+                            />
+
                         ) : (
                             <>
                                 {hasStockProblem && (
@@ -206,7 +236,7 @@ export default function CartDrawer() {
                                         <div className="text-white/80 font-semibold text-sm">Could not check stock</div>
                                         <button
                                             onClick={loadStock}
-                                            className="mt-2 px-3 py-2 rounded-lg bg-white text-black font-semibold"
+                                            className="mt-2 px-3 py-2 rounded-lg bg-black text-white font-semibold"
                                             type="button"
                                         >
                                             Retry
@@ -228,7 +258,9 @@ export default function CartDrawer() {
                                                 <div className="flex items-start justify-between gap-3">
                                                     <div className="min-w-0">
                                                         <div className="font-semibold text-white truncate">{it.title}</div>
-                                                        <div className="text-white/60 text-sm">{money(it.price)}</div>
+                                                        <div className="text-white/60 text-sm">
+                                                            {money(it.price)} <span className="text-white/40">×</span> {it.qty}
+                                                        </div>
                                                         {hint && (
                                                             <div className={`text-xs mt-1 ${bad ? "text-amber-200" : "text-white/40"}`}>
                                                                 {hint}
@@ -282,10 +314,32 @@ export default function CartDrawer() {
 
                     {/* Footer */}
                     <div className="p-4 border-t border-white/10 space-y-3">
-                        <div className="flex items-center justify-between">
-                            <div className="text-white/60">Total</div>
-                            <div className="text-2xl font-extrabold text-white">{money(total)}</div>
+                        <div className="rounded-2xl bg-white/5 border border-white/10 p-4 space-y-2">
+                            <div className="flex items-center justify-between text-sm">
+                                <div className="text-white/60">Subtotal</div>
+                                <div className="text-white/90 font-semibold">{money(subtotal)}</div>
+                            </div>
+
+                            <div className="flex items-center justify-between text-sm">
+                                <div className="text-white/60">Shipping</div>
+                                <div className="text-white/90 font-semibold">
+                                    {shipping === 0 ? "Free" : money(shipping)}
+                                </div>
+                            </div>
+
+                            <div className="flex items-center justify-between text-sm">
+                                <div className="text-white/60">Tax</div>
+                                <div className="text-white/90 font-semibold">{money(tax)}</div>
+                            </div>
+
+                            <div className="h-px bg-white/10 my-2" />
+
+                            <div className="flex items-center justify-between">
+                                <div className="text-white font-semibold">Total</div>
+                                <div className="text-2xl font-extrabold text-white">{money(grandTotal)}</div>
+                            </div>
                         </div>
+
 
                         <div className="grid grid-cols-2 gap-2">
                             <button
@@ -299,7 +353,7 @@ export default function CartDrawer() {
                             <button
                                 onClick={goCheckout}
                                 disabled={!canCheckout}
-                                className="px-4 py-2 rounded-lg bg-white text-black font-semibold disabled:opacity-60"
+                                className="px-4 py-2 rounded-lg bg-black text-white font-semibold disabled:opacity-60"
                                 type="button"
                                 title={!canCheckout ? "Fix stock issues first" : "Checkout"}
                             >

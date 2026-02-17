@@ -1,9 +1,8 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import Register from "./pages/Register";
 import Login from "./pages/Login";
 import Shop from "./pages/Shop";
-import CartPage from "./pages/CartPage";
 import Checkout from "./pages/Checkout";
 import OrderSuccess from "./pages/OrderSuccess";
 import OrderDetails from "./pages/OrderDetails";
@@ -32,7 +31,6 @@ export default function App() {
 
                 {/* ---------- Public ---------- */}
                 <Route path="/" element={<Shop />} />
-                <Route path="/cart" element={<CartPage />} />
                 <Route path="/products/:id" element={<ProductDetails />} />
 
                 {/* ---------- User Protected ---------- */}

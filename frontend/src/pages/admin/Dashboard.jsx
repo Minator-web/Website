@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
+import { formatUSD } from "../../lib/format";
 
 function money(n) {
-    const x = Number(n ?? 0);
-    return x.toLocaleString();
+    return formatUSD(n);
 }
+
 
 function Badge({ children }) {
     return (

@@ -68,15 +68,8 @@ export async function api(path, options = {}) {
 }
 
 export async function fetchStockMap(productIds) {
-    const ids = (productIds || [])
-        .map((x) => Number(x))
-        .filter((x) => Number.isInteger(x) && x > 0);
-
-    if (ids.length === 0) return {};
-    const res = await fetch(`${BASE_URL}/api/products/stock`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ product_ids: ids }),
-    });
-    return res;
+    const ids = (productIds || []).map(Number).filter((x)=>Number.isInteger(x) && x>0);
+    if (!ids.length) return [];
+    return api("/api/products/stock", { method:"POST", body: JSON.stringify({ ids }) });
 }
+

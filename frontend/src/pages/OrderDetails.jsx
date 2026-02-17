@@ -163,7 +163,7 @@ export default function OrderDetails() {
                     <div className="mt-5 flex items-center gap-3">
                         <button
                             onClick={load}
-                            className="px-4 py-2 rounded-lg bg-white text-black font-semibold"
+                            className="px-4 py-2 rounded-lg bg-black text-white font-semibold"
                             type="button"
                         >
                             Retry
@@ -280,7 +280,7 @@ export default function OrderDetails() {
 
                     <Link
                         to="/my-orders"
-                        className="inline-block px-4 py-2 rounded-lg bg-white text-black font-semibold"
+                        className="inline-block px-4 py-2 rounded-lg bg-black text-white font-semibold"
                     >
                         Back to My Orders
                     </Link>

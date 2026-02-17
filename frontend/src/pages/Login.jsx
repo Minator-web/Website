@@ -1,9 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
+import { useLocation } from "react-router-dom";
 
 export default function Login() {
     const navigate = useNavigate();
+    const location = useLocation();
+    const from = location.state?.from || "/";
+
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [showPass, setShowPass] = useState(false);
@@ -40,8 +44,11 @@ export default function Login() {
 
             window.dispatchEvent(new Event("auth:changed"));
 
-            if (role === "admin") navigate("/admin");
-            else navigate("/");
+            if (role === "admin" || role === "super_admin") {
+                navigate("/admin", { replace: true });
+            } else {
+                navigate(from, { replace: true });
+            }
         } catch (err) {
             localStorage.removeItem("token");
             localStorage.removeItem("role");

@@ -5,29 +5,46 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 
 class AuthController extends Controller
 {
     public function register(Request $request)
     {
-        $data = $request->validate([
-            "name" => "required|string|max:255",
-            "email" => "required|email|unique:users,email",
-            "password" => "required|string|min:6",
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'string', 'email:rfc,dns', 'max:255', Rule::unique('users', 'email')],
+            'password' => [
+                'required',
+                'string',
+                'min:8',
+                'confirmed',
+                'regex:/[A-Za-z]/',
+                'regex:/[0-9]/',
+            ],
+        ], [
+            'password.regex' => 'Password must contain letters and numbers.',
         ]);
 
         $user = User::create([
-            "name" => $data["name"],
-            "email" => $data["email"],
-            "password" => Hash::make($data["password"]),
+            'name' => $validated['name'],
+            'email' => strtolower($validated['email']),
+            'password' => Hash::make($validated['password']),
+            'role' => 'user',
         ]);
 
-        $token = $user->createToken("auth_token")->plainTextToken;
+        $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
-            "user" => $user,
-            "token" => $token,
-        ]);
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => $user->role ?? null,
+                'created_at' => $user->created_at,
+            ],
+            'token' => $token,
+        ], 201);
     }
 
     public function login(Request $request)

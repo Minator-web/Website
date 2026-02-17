@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { api } from "../lib/api";
+import { api, clearMeCache } from "../lib/auth";
 
 export default function Register() {
     const navigate = useNavigate();
@@ -8,20 +8,38 @@ export default function Register() {
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [passwordConfirmation, setPasswordConfirmation] = useState("");
 
     const [showPass, setShowPass] = useState(false);
+    const [showPass2, setShowPass2] = useState(false);
+
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
     async function handleSubmit(e) {
         e.preventDefault();
         setError("");
+
+        const cleanName = name.trim();
+        const cleanEmail = email.trim().toLowerCase();
+
+        if (!cleanName) return setError("Name is required");
+        if (!cleanEmail) return setError("Email is required");
+
+        if (password.length < 8) return setError("Password must be at least 8 characters");
+        if (password !== passwordConfirmation) return setError("Passwords do not match");
+
         setLoading(true);
 
         try {
             const reg = await api("/api/register", {
                 method: "POST",
-                body: JSON.stringify({ name, email, password }),
+                body: JSON.stringify({
+                    name: cleanName,
+                    email: cleanEmail,
+                    password,
+                    password_confirmation: passwordConfirmation,
+                }),
             });
 
             let token =
@@ -33,7 +51,7 @@ export default function Register() {
             if (!token) {
                 const login = await api("/api/login", {
                     method: "POST",
-                    body: JSON.stringify({ email, password }),
+                    body: JSON.stringify({ email: cleanEmail, password }),
                 });
 
                 token =
@@ -49,6 +67,12 @@ export default function Register() {
             }
 
             localStorage.setItem("token", token);
+
+            const role = reg?.user?.role || reg?.data?.user?.role;
+            if (role) localStorage.setItem("role", role);
+
+            clearMeCache?.();
+            window.dispatchEvent(new Event("auth:changed"));
 
             navigate("/", { replace: true });
         } catch (err) {
@@ -77,12 +101,8 @@ export default function Register() {
                     <div className="pointer-events-none absolute -top-24 -right-24 h-48 w-48 rounded-full bg-white/5 blur-2xl" />
 
                     <div className="space-y-1">
-                        <h1 className="text-2xl font-extrabold tracking-tight text-white">
-                            Create account
-                        </h1>
-                        <p className="text-sm text-white/60">
-                            Sign up to start shopping
-                        </p>
+                        <h1 className="text-2xl font-extrabold tracking-tight text-white">Create account</h1>
+                        <p className="text-sm text-white/60">Sign up to start shopping</p>
                     </div>
 
                     {error && (
@@ -93,9 +113,7 @@ export default function Register() {
 
                     <div className="space-y-4">
                         <div>
-                            <label className="block text-sm font-medium text-white/80 mb-1.5">
-                                Name
-                            </label>
+                            <label className="block text-sm font-medium text-white/80 mb-1.5">Name</label>
                             <input
                                 className={inputCls}
                                 value={name}
@@ -108,9 +126,7 @@ export default function Register() {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-white/80 mb-1.5">
-                                Email
-                            </label>
+                            <label className="block text-sm font-medium text-white/80 mb-1.5">Email</label>
                             <input
                                 className={inputCls}
                                 value={email}
@@ -123,10 +139,7 @@ export default function Register() {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-white/80 mb-1.5">
-                                Password
-                            </label>
-
+                            <label className="block text-sm font-medium text-white/80 mb-1.5">Password</label>
                             <div className="relative">
                                 <input
                                     className={`${inputCls} pr-12`}
@@ -137,7 +150,6 @@ export default function Register() {
                                     autoComplete="new-password"
                                     required
                                 />
-
                                 <button
                                     type="button"
                                     onClick={() => setShowPass((s) => !s)}
@@ -146,10 +158,34 @@ export default function Register() {
                                     {showPass ? "Hide" : "Show"}
                                 </button>
                             </div>
+                            <p className="mt-2 text-xs text-white/50">Use at least 8 characters.</p>
+                        </div>
 
-                            <p className="mt-2 text-xs text-white/50">
-                                Use at least 8 characters.
-                            </p>
+                        <div>
+                            <label className="block text-sm font-medium text-white/80 mb-1.5">Confirm Password</label>
+                            <div className="relative">
+                                <input
+                                    className={`${inputCls} pr-12`}
+                                    value={passwordConfirmation}
+                                    onChange={(e) => setPasswordConfirmation(e.target.value)}
+                                    type={showPass2 ? "text" : "password"}
+                                    placeholder="••••••••"
+                                    autoComplete="new-password"
+                                    required
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPass2((s) => !s)}
+                                    className="absolute top-1/2 -translate-y-1/2 right-2 rounded-md px-2 py-0.5 text-[10px] font-medium text-white/60 hover:bg-white/10 bg-transparent border-0 leading-none"
+                                >
+                                    {showPass2 ? "Hide" : "Show"}
+                                </button>
+                            </div>
+
+                            {/* کمک UX: mismatch hint */}
+                            {passwordConfirmation && password !== passwordConfirmation && (
+                                <p className="mt-2 text-xs text-red-300/80">Passwords do not match.</p>
+                            )}
                         </div>
                     </div>
 
@@ -168,9 +204,7 @@ export default function Register() {
                     </p>
                 </form>
 
-                <p className="mt-4 text-center text-xs text-white/40">
-                    © {new Date().getFullYear()} Shop
-                </p>
+                <p className="mt-4 text-center text-xs text-white/40">© {new Date().getFullYear()} Shop</p>
             </div>
         </div>
     );

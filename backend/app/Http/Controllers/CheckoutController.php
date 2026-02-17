@@ -74,14 +74,14 @@ class CheckoutController extends Controller
                 }
 
                 if (!$p->is_active) {
-                    return response()->json(['message' => "Product {$p->id} is not active"], 422);
+                    return response()->json(['message' => "Product $p->id is not active"], 422);
                 }
 
                 $qty = (int) $it['qty'];
 
                 if ((int) $p->stock < $qty) {
                     return response()->json([
-                        'message' => "Insufficient stock for {$p->title}",
+                        'message' => "Insufficient stock for $p->title",
                         'product_id' => $p->id,
                         'available' => (int) $p->stock,
                         'requested' => $qty,

@@ -2,6 +2,10 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import { api } from "../../lib/api";
 import Skeleton from "../../components/Skeleton";
 import { useToast } from "../../context/ToastContext";
+import { formatUSD } from "../../lib/format";
+import StockBadge from "../../components/StockBadge";
+import EmptyState from "../../components/EmptyState";
+
 
 const inputCls =
     "w-full rounded-lg bg-zinc-950 border border-white/10 text-white placeholder:text-white/40 p-2 " +
@@ -10,7 +14,7 @@ const inputCls =
 const labelCls = "block text-sm mb-1 text-white/80";
 
 const btnPrimary =
-    "px-4 py-2 rounded-lg bg-white text-black font-medium hover:opacity-90 transition disabled:opacity-60";
+    "px-4 py-2 rounded-lg bg-white text-white font-medium hover:opacity-90 transition disabled:opacity-60";
 
 const btnDark =
     "px-3 py-2 rounded-lg bg-black text-white border border-white/10 hover:bg-white/5 transition disabled:opacity-60";
@@ -313,11 +317,11 @@ export default function Products() {
                             className={inputCls}
                             value={price}
                             onChange={(e) => setPrice(e.target.value)}
-                            placeholder="100000"
+                            placeholder="19.99"
                             type="number"
                             min="0"
-                            step="1"
-                            inputMode="numeric"
+                            step="0.01"
+                            inputMode="decimal"
                             required
                             disabled={createLoading}
                         />
@@ -402,10 +406,11 @@ export default function Products() {
                         </button>
                     </div>
                 ) : items.length === 0 ? (
-                    <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-                        <div className="text-white font-semibold">No products yet</div>
-                        <div className="text-white/60 mt-2 text-sm">Create your first product using the form above.</div>
-                    </div>
+                    <EmptyState
+                        icon="📦"
+                        title="No products yet"
+                        description="Create your first product using the form above."
+                    />
                 ) : (
                     <div className="overflow-auto rounded-xl border border-white/10">
                         <table className="min-w-225 w-full text-sm text-white/90">
@@ -441,20 +446,25 @@ export default function Products() {
                                         </td>
 
                                         <td className="py-3 px-3 font-medium">{p.title}</td>
-                                        <td className="py-3 px-3">{p.price}</td>
+                                        <td className="py-3 px-3">{formatUSD(p.price)}</td>
                                         <td className="py-3 px-3">{p.stock}</td>
+
+                                        <td className="py-3 px-3">
+                                            <StockBadge stock={p.stock} isActive={true} />
+                                        </td>
 
                                         <td className="py-3 px-3">
                                             {p.is_active ? (
                                                 <span className="px-2 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-200 text-xs">
-                            Active
-                          </span>
+      Active
+    </span>
                                             ) : (
                                                 <span className="px-2 py-1 rounded-full bg-zinc-500/15 border border-white/10 text-white/70 text-xs">
-                            Disabled
-                          </span>
+      Disabled
+    </span>
                                             )}
                                         </td>
+
 
                                         <td className="py-3 px-3">
                                             <div className="flex gap-2">
@@ -516,6 +526,8 @@ export default function Products() {
                                         onChange={(e) => setEditPrice(e.target.value)}
                                         type="number"
                                         min="0"
+                                        step="0.01"
+                                        inputMode="decimal"
                                         required
                                         disabled={updateLoading}
                                     />

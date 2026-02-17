@@ -7,6 +7,9 @@ import Skeleton from "../components/Skeleton";
 import { useToast } from "../context/ToastContext";
 import { useDrawer } from "../context/DrawerContext";
 import { useWishlist } from "../context/WishlistContext";
+import { formatUSD } from "../lib/format";
+import StockBadge from "../components/StockBadge";
+import EmptyState from "../components/EmptyState";
 
 
 
@@ -18,6 +21,7 @@ const input =
 
 const select =
     "rounded-lg bg-zinc-950 border border-white/10 text-white p-2 focus:outline-none focus:ring-2 focus:ring-white/20";
+
 
 function ShopSkeleton() {
     return (
@@ -46,8 +50,7 @@ export default function Shop() {
     const { openCart, toggleCart } = useDrawer();
     const showCart = openCart || toggleCart;
 
-    const [likedIds, setLikedIds] = useState(() => new Set());
-    const [likeLoadingId, setLikeLoadingId] = useState(null);
+    const [, setLikedIds] = useState(() => new Set());
 
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -55,7 +58,6 @@ export default function Shop() {
 
     const [q, setQ] = useState("");
     const [onlyInStock, setOnlyInStock] = useState(false);
-    const [onlyActive, setOnlyActive] = useState(true);
     const [sortBy, setSortBy] = useState("newest");
 
     const load = useCallback(async () => {
@@ -93,46 +95,10 @@ export default function Shop() {
     useEffect(() => {
         load();
     }, [load]);
-
-    async function toggleLike(e, productId) {
-        e.preventDefault();
-        e.stopPropagation();
-
-        if (!token) {
-            toast.push({ type: "info", title: "Login Please" });
-            return;
-        }
-
-        if (likeLoadingId === productId) return;
-
-        setLikeLoadingId(productId);
-
-        try {
-            const res = await api(`/api/wishlist/${productId}/toggle`, { method: "POST" });
-
-            setLikedIds((prev) => {
-                const n = new Set(prev);
-                if (res?.liked) n.add(Number(productId));
-                else n.delete(Number(productId));
-                return n;
-            });
-
-            toast.push({
-                type: res?.liked ? "success" : "info",
-                title: res?.liked ? "Added to Wishlist" : "Deleted from Wishlist",
-            });
-        } catch (err) {
-            toast.push({ type: "error", message: err?.message || "Error in Wishlist" });
-        } finally {
-            setLikeLoadingId(null);
-        }
-    }
-
     const filtered = useMemo(() => {
         const query = q.trim().toLowerCase();
         let list = [...products];
 
-        if (onlyActive) list = list.filter((p) => !!p.is_active);
         if (onlyInStock) list = list.filter((p) => Number(p.stock ?? 0) > 0);
 
         if (query) {
@@ -152,7 +118,7 @@ export default function Shop() {
         }
 
         return list;
-    }, [products, q, onlyActive, onlyInStock, sortBy]);
+    }, [products, q, onlyInStock, sortBy]);
 
     function addToCart(e, p) {
         e.preventDefault();
@@ -195,16 +161,6 @@ export default function Shop() {
                             <label className="flex items-center gap-2 text-sm text-white/80">
                                 <input
                                     type="checkbox"
-                                    checked={onlyActive}
-                                    onChange={(e) => setOnlyActive(e.target.checked)}
-                                    className="h-4 w-4"
-                                />
-                                Active only
-                            </label>
-
-                            <label className="flex items-center gap-2 text-sm text-white/80">
-                                <input
-                                    type="checkbox"
                                     checked={onlyInStock}
                                     onChange={(e) => setOnlyInStock(e.target.checked)}
                                     className="h-4 w-4"
@@ -238,51 +194,59 @@ export default function Shop() {
                 {loading ? (
                     <ShopSkeleton />
                 ) : loadFailed ? (
-                    <div className="bg-zinc-900/70 border border-white/10 rounded-2xl p-8">
-                        <div className="text-xl font-bold">Could not load products</div>
-                        <div className="mt-2 text-white/60">Please try again.</div>
-                        <button
-                            onClick={load}
-                            className="mt-5 px-4 py-2 rounded-lg bg-black text-white font-semibold"
-                            type="button"
-                        >
-                            Retry
-                        </button>
-                    </div>
+                    <EmptyState
+                        icon="⚠️"
+                        title="Could not load products"
+                        description="Please check your connection and try again."
+                        actions={
+                            <>
+                                <button
+                                    onClick={load}
+                                    className="px-4 py-2 rounded-lg bg-black text-white border border-white/10 hover:bg-white/5"
+                                    type="button"
+                                >
+                                    Retry
+                                </button>
+
+                            </>
+                        }
+                    />
+
                 ) : filtered.length === 0 ? (
-                    <div className="bg-zinc-900/70 border border-white/10 rounded-2xl p-8">
-                        <div className="text-xl font-bold">No products found</div>
-                        <div className="mt-2 text-white/60">Try changing filters or clearing the search.</div>
+                        <EmptyState
+                            icon="🔎"
+                            title="No products found"
+                            description="Try changing filters or clearing the search."
+                            actions={
+                                <>
+                                    <button
+                                        onClick={() => {
+                                            setQ("");
+                                            setOnlyInStock(false);
+                                            setSortBy("newest");
+                                        }}
+                                        className="px-4 py-2 rounded-lg bg-black text-white border border-white/10 hover:bg-white/5"
+                                        type="button"
+                                    >
+                                        Reset filters
+                                    </button>
 
-                        <div className="mt-5 flex gap-2">
-                            <button
-                                onClick={() => {
-                                    setQ("");
-                                    setOnlyActive(true);
-                                    setOnlyInStock(false);
-                                    setSortBy("newest");
-                                }}
-                                className="px-4 py-2 rounded-lg bg-black text-white font-semibold"
-                                type="button"
-                            >
-                                Reset filters
-                            </button>
+                                    <button
+                                        onClick={load}
+                                        className="px-4 py-2 rounded-lg bg-white/10 border border-white/10 text-white hover:bg-white/15"
+                                        type="button"
+                                    >
+                                        Refresh
+                                    </button>
+                                </>
+                            }
+                        />
 
-                            <button
-                                onClick={load}
-                                className="px-4 py-2 rounded-lg bg-black text-white border border-white/10 hover:bg-white/5"
-                                type="button"
-                            >
-                                Refresh
-                            </button>
-                        </div>
-                    </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {filtered.map((p) => {
                             const isActive = !!p.is_active;
                             const stock = Number(p.stock ?? 0);
-                            const likeBusy = likeLoadingId === p.id;
                             const liked = isLiked(p.id);
 
                             return (
@@ -323,14 +287,15 @@ export default function Shop() {
 
                                         <div className="font-semibold text-lg">{p.title}</div>
 
-                                        <div className="text-white/60 text-sm mt-1">
-                                            Stock: <span className="text-white/80">{stock}</span>{" "}
-                                            {!isActive ? <span className="ml-2 text-red-200">(inactive)</span> : null}
+                                        <div className="mt-2">
+                                            <StockBadge stock={stock} isActive={isActive} />
                                         </div>
 
+
                                         <div className="text-white font-extrabold text-xl mt-2">
-                                            {Number(p.price).toLocaleString()}
+                                            {formatUSD(p.price)}
                                         </div>
+
 
                                         <button
                                             disabled={!isActive || stock <= 0}

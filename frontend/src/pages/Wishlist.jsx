@@ -124,7 +124,7 @@ export default function Wishlist() {
                         <div className="mt-2 text-white/60">Go add some products ❤️</div>
                         <Link
                             to="/"
-                            className="inline-block mt-5 px-4 py-2 rounded-lg bg-white text-black font-semibold"
+                            className="inline-block mt-5 px-4 py-2 rounded-lg bg-black text-white font-semibold"
                         >
                             Back to shop
                         </Link>

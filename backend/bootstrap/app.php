@@ -1,20 +1,24 @@
 <?php
 
+use App\Http\Middleware\IsAdmin;
+use App\Http\Middleware\IsSuperAdmin;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
-        web: __DIR__.'/../routes/web.php',
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->alias([
-            'is_super_admin' => \App\Http\Middleware\IsSuperAdmin::class,
-            'is_admin'       => \App\Http\Middleware\IsAdmin::class,
+            'is_super_admin' => IsSuperAdmin::class,
+            'is_admin'       => IsAdmin::class,
         ]);
     })
 
@@ -25,7 +29,7 @@ return Application::configure(basePath: dirname(__DIR__))
             if ($request->is('api/*') || $request->expectsJson()) {
 
                 // 422 Validation
-                if ($e instanceof \Illuminate\Validation\ValidationException) {
+                if ($e instanceof ValidationException) {
                     return response()->json([
                         'message' => $e->getMessage(),
                         'errors' => $e->errors(),
@@ -33,14 +37,14 @@ return Application::configure(basePath: dirname(__DIR__))
                 }
 
                 // 401 Unauthenticated
-                if ($e instanceof \Illuminate\Auth\AuthenticationException) {
+                if ($e instanceof AuthenticationException) {
                     return response()->json([
                         'message' => 'Unauthenticated',
                     ], 401);
                 }
 
                 // 403/404/429/... Http exceptions
-                if ($e instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface) {
+                if ($e instanceof HttpExceptionInterface) {
                     $status = $e->getStatusCode();
 
                     $message = $e->getMessage() ?: match ($status) {

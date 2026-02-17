@@ -111,7 +111,7 @@ export default function MyOrders() {
                             </div>
                             <Link
                                 to="/"
-                                className="mt-5 inline-block px-4 py-2 rounded-lg bg-white text-black font-semibold"
+                                className="mt-5 inline-block px-4 py-2 rounded-lg bg-black text-white font-semibold"
                             >
                                 Go shopping
                             </Link>
